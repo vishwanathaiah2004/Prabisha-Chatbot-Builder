@@ -41,7 +41,29 @@ function timer(label: string) {
   };
 }
 
+// ─── Intent Detection ─────────────────────────────────────────────────────────
+type DetectedIntent =
+  | 'GREETING'
+  | 'PRICING'
+  | 'OBJECTION'
+  | 'FEATURE'
+  | 'BUYING'
+  | 'GENERAL';
+
+function detectIntent(message: string): DetectedIntent {
+  const msg = message.toLowerCase();
+
+  if (/^(hi|hello|hey)\b/.test(msg)) return 'GREETING';
+  if (msg.includes('price') || msg.includes('cost') || msg.includes('pricing')) return 'PRICING';
+  if (msg.includes('why should') || msg.includes('better than') || msg.includes('different from')) return 'OBJECTION';
+  if (msg.includes('integrate') || msg.includes('how does') || msg.includes('work')) return 'FEATURE';
+  if (msg.includes('sign up') || msg.includes('start') || msg.includes('get started')) return 'BUYING';
+
+  return 'GENERAL';
+}
+
 // ─── Prompts ──────────────────────────────────────────────────────────────────
+
 const QUERY_REWRITE_PROMPT = `Generate 2-3 search variations for this question to capture different angles.
 Keep each variation focused and 5-15 words.
 
@@ -51,9 +73,27 @@ Output format (one per line):
 1. [variation]
 2. [variation]
 3. [variation]`;
+=======
+const QUERY_REWRITE_PROMPT = `
+You are a semantic retrieval strategist for a modern SaaS AI system.
+
+Your task:
+Generate up to 2 alternative search queries that improve knowledge retrieval
+while preserving the user's exact intent.
+
+STRICT RULES:
+- Do NOT change meaning
+- Preserve product names, brands, and proper nouns
+- Do NOT introduce new assumptions
+- Each variation must explore a different angle (features, pricing, use case, comparison, problem)
+- 5-12 words each
+- No filler words
+- No explanations
+>>>>>>> e9e18ed (fix(chatbot): removed second LLM refinement pass to prevent meta commentary responses)
 
 const RAG_ANSWER_PROMPT = `You are a helpful assistant. Answer the user's question using ONLY the CONTEXT provided below.
 
+<<<<<<< HEAD
 RESPONSE RULES:
 1. Use information from the context — be specific about products, prices, features, or details mentioned
 2. If context is partially relevant, use what applies and acknowledge what you don't know
@@ -66,6 +106,18 @@ HTML FORMATTING (strictly follow):
 - Use <strong> only for product names or key terms
 - NO <br> tags, NO blank lines between elements
 - Output compact HTML only — no markdown, no plain text
+=======
+Output format:
+One variation per line
+No numbering
+No extra text
+`;
+const RAG_ANSWER_PROMPT = `
+You are a senior AI product advisor at a modern SaaS company.
+
+You speak like a real human founder — calm, confident, precise.
+Never sound robotic. Never sound scripted.
+>>>>>>> e9e18ed (fix(chatbot): removed second LLM refinement pass to prevent meta commentary responses)
 
 SOURCE CITATION RULES:
 - Each context chunk starts with a label like: [Chunk 1 | Source: Page Title (https://example.com/page/)]
@@ -76,11 +128,49 @@ SOURCE CITATION RULES:
 - Only use URLs that APPEAR in the context labels — never invent or guess URLs
 - If a chunk has no URL in its label, do not add a citation for it
 
+<<<<<<< HEAD
 FOLLOW-UP RULE:
 - End with exactly ONE relevant follow-up question
 - Wrap it in: <p class="follow-up-question">...</p>
 - Must be the very last element
 
+=======
+Detected user intent: {intent}
+
+────────────────────────
+BEHAVIOR RULES
+────────────────────────
+• Greeting → short, warm, natural (1-2 sentences max)
+• Pricing → direct and transparent
+• Objection → acknowledge concern calmly, then explain clearly
+• Feature question → structured explanation
+• Buying intent → guide next step naturally
+• Vague question → ask one smart clarification
+
+Never use:
+- "industry leading"
+- "cutting-edge"
+- "thousands of satisfied clients"
+Unless explicitly present in context.
+
+If information is missing, say:
+"I don't have that information available right now."
+
+Do NOT say:
+- "based on the provided context"
+- "as an AI"
+
+────────────────────────
+HTML FORMAT (STRICT)
+────────────────────────
+- Wrap paragraphs in <p>
+- Use <ul><li> if needed
+- No markdown
+- No <br>
+- Compact HTML only
+
+────────────────────────
+>>>>>>> e9e18ed (fix(chatbot): removed second LLM refinement pass to prevent meta commentary responses)
 CONTEXT:
 {context}
 
@@ -93,6 +183,7 @@ Output ONLY compact HTML. Answer first with inline citations where applicable, t
 
 const GENERAL_ANSWER_PROMPT = `{systemPrompt}
 
+<<<<<<< HEAD
 You're having a conversation with a user. They may ask about services, features, or general questions.
 
 CRITICAL FORMATTING RULES - FOLLOW EXACTLY:
@@ -102,6 +193,25 @@ CRITICAL FORMATTING RULES - FOLLOW EXACTLY:
 - DO NOT add extra <br> tags or newlines
 - DO NOT add blank lines between elements
 - Keep HTML compact and clean
+=======
+You are continuing an ongoing SaaS conversation.
+
+Detected user intent: {intent}
+
+Be natural. Be human. Be concise.
+Avoid marketing tone.
+Avoid long monologues.
+
+If unsure, say:
+"I don't have that information available right now."
+
+HTML Rules:
+- Wrap text in <p>
+- Use <ul><li> if needed
+- No markdown
+- No <br>
+- Compact HTML only
+>>>>>>> e9e18ed (fix(chatbot): removed second LLM refinement pass to prevent meta commentary responses)
 
 CONVERSATION HISTORY:
 {history}
@@ -316,6 +426,7 @@ export async function getLogicContext(chatbot: any, message: string, preloadedLo
 }
 
 function generateSystemPrompt(chatbot: any): string {
+<<<<<<< HEAD
   const base = chatbot.directive || "You are a helpful, knowledgeable assistant.";
   const personality = chatbot.description ? `\n\nYour personality: ${chatbot.description}` : "";
   const guidelines = `\n\nGuidelines:
@@ -325,6 +436,34 @@ function generateSystemPrompt(chatbot: any): string {
 - Stay professional but friendly
 - Format responses in HTML for better readability`;
   return `${base}${personality}${guidelines}`;
+=======
+  return `
+You are a senior customer success and product specialist for a modern AI SaaS company.
+
+Your responsibilities:
+- Clearly explain services
+- Build trust through transparency
+- Guide users toward the right solution
+- Keep answers structured and helpful
+
+Communication style:
+- Natural and human
+- Calm and confident
+- Clear and concise
+- No hype
+- No buzzwords
+- No robotic apologies
+
+If information is missing, say:
+"I don't have that information available right now."
+
+Company context:
+${chatbot.directive || ''}
+
+Brand personality:
+${chatbot.description || 'Professional, modern, and helpful.'}
+`;
+>>>>>>> e9e18ed (fix(chatbot): removed second LLM refinement pass to prevent meta commentary responses)
 }
 
 export async function checkLogicTriggers(chatbot: any, message: string, preloadedLogic?: any) {
@@ -535,6 +674,7 @@ export async function generateRAGResponse(
   tLogicCtx.end();
 
   const formattedHistory = formatHistory(history);
+  const intent = detectIntent(userMessage);
 
   // STEP 2: Smart vector search — original query first, only expand if needed
   const tStep2 = timer(`Step 2: vector search (smart, ${chatbot.knowledgeBases?.length ?? 0} KBs)`);
@@ -559,7 +699,9 @@ export async function generateRAGResponse(
   )).flat();
   tPhase2a.end();
 
-  const bestScore = searchresults.reduce((max, r) => Math.max(max, r.score ?? 0), 0);
+  // Confidence threshold — avoid forced robotic RAG
+const bestScore = searchresults.reduce((max, r) => Math.max(max, r.score ?? 0), 0);
+
   console.log(`   └─ ${searchresults.length} results, best score: ${bestScore.toFixed(3)}`);
 
   tStep2.end();
@@ -569,33 +711,58 @@ export async function generateRAGResponse(
   tProcess.end();
 
   console.log(`   └─ knowledgeContext length: ${knowledgeContext.length} chars, sources: ${sources.length}`);
-
+    
+  const strongContext = bestScore >= 0.45 && knowledgeContext.length > 0;
+     
   // STEP 3: LLM generation
-  const prompt = knowledgeContext
-    ? RAG_ANSWER_PROMPT
-        .replace('{context}', knowledgeContext)
-        .replace('{history}', formattedHistory)
-        .replace('{question}', userMessage)
-    : GENERAL_ANSWER_PROMPT
-        .replace('{systemPrompt}', generateSystemPrompt(chatbot))
-        .replace('{history}', formattedHistory)
-        .replace('{logicContext}', logicContext)
-        .replace('{question}', userMessage);
+  
+const prompt = strongContext
+  ? RAG_ANSWER_PROMPT
+      .replace('{intent}', intent)
+      .replace('{context}', knowledgeContext)
+      .replace('{history}', formattedHistory)
+      .replace('{question}', userMessage)
+  : GENERAL_ANSWER_PROMPT
+      .replace('{intent}', intent)
+      .replace('{systemPrompt}', generateSystemPrompt(chatbot))
+      .replace('{history}', formattedHistory)
+      .replace('{logicContext}', logicContext)
+      .replace('{question}', userMessage);
 
-  const tLLM = timer('Step 3: LLM generateText (gemini-3-flash-preview)');
-  const { text } = await generateText({
-    model: googleAI('gemini-2.5-flash'),  // fast, stable, low-latency
-    prompt,
-    maxOutputTokens: chatbot.max_tokens || 400,  // shorter = faster TTFT
-    temperature: chatbot.temperature || 0.7,
-  });
+  const tLLM = timer('Step 3: LLM generateText (gemini-2.5-flash-preview)');
+ // First generation (creative)
+const { text } = await generateText({
+  model: googleAI('gemini-2.5-flash'),
+  prompt,
+  maxOutputTokens: chatbot.max_tokens || 400,
+  temperature: chatbot.temperature ?? 0.82,
+});
+
+
   tLLM.end();
 
   console.log(`   └─ LLM output length: ${text.length} chars`);
 
   const tHtml = timer('Step 4: cleanHtml + appendReadMore');
-  const htmlResponse = appendReadMoreSection(cleanHtmlResponse(ensureHtmlFormat(text)), sources);
-  tHtml.end();
+let cleaned = cleanHtmlResponse(ensureHtmlFormat(text));
+
+const isFallback =
+  text.toLowerCase().includes("I don't have that information at the moment.");
+
+const isKnowledgeIntent =
+  intent === 'FEATURE' ||
+  intent === 'GENERAL';
+
+const shouldShowSources =
+  strongContext &&
+  isKnowledgeIntent &&
+  !isFallback &&
+  cleaned.length > 120; // avoid tiny generic replies
+
+const htmlResponse = shouldShowSources
+  ? appendReadMoreSection(cleaned, sources)
+  : cleaned;
+    tHtml.end();
 
   tTotal.end();
   console.groupEnd();
@@ -845,6 +1012,7 @@ export async function streamRAGResponse(
   tHistory.end();
 
   const formattedHistory = formatHistory(history);
+  const intent = detectIntent(userMessage);
 
   const tRewrite = timer('rewriteQuery');
   const queries = await rewriteQuery(userMessage);
@@ -859,22 +1027,24 @@ export async function streamRAGResponse(
   tLogic.end();
 
   const prompt = knowledgeContext
-    ? RAG_ANSWER_PROMPT
-        .replace('{context}', knowledgeContext)
-        .replace('{history}', formattedHistory)
-        .replace('{question}', userMessage)
-    : GENERAL_ANSWER_PROMPT
-        .replace('{systemPrompt}', generateSystemPrompt(chatbot))
-        .replace('{history}', formattedHistory)
-        .replace('{logicContext}', logicContext)
-        .replace('{question}', userMessage);
+  ? RAG_ANSWER_PROMPT
+      .replace('{intent}', intent)
+      .replace('{context}', knowledgeContext)
+      .replace('{history}', formattedHistory)
+      .replace('{question}', userMessage)
+  : GENERAL_ANSWER_PROMPT
+      .replace('{intent}', intent)
+      .replace('{systemPrompt}', generateSystemPrompt(chatbot))
+      .replace('{history}', formattedHistory)
+      .replace('{logicContext}', logicContext)
+      .replace('{question}', userMessage);
 
   const tStreamInit = timer('streamText init (LLM call start)');
   const result = await streamText({
     model: googleAI('gemini-2.5-flash'),  // fast, stable, low-latency
     prompt,
     maxOutputTokens: chatbot.max_tokens || 400,
-    temperature: chatbot.temperature || 0.7,
+    temperature: chatbot.temperature ?? 0.82,
   });
   tStreamInit.end();
 
