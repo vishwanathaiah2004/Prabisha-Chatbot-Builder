@@ -41,76 +41,159 @@ function timer(label: string) {
   };
 }
 
+// ─── Intent Detection ─────────────────────────────────────────────────────────
+type DetectedIntent =
+  | 'GREETING'
+  | 'PRICING'
+  | 'OBJECTION'
+  | 'FEATURE'
+  | 'BUYING'
+  | 'GENERAL';
+
+ function detectIntent(message: string): DetectedIntent {
+  const msg = message.toLowerCase().trim();
+
+  // Greetings & small talk
+  if (/(^|\b)(hi|hello|hey|good morning|good evening|good afternoon)\b/.test(msg))
+    return 'GREETING';
+
+  if (/(how are you|what's up|how's it going)/.test(msg))
+    return 'GREETING';
+
+  // Pricing
+  if (/(price|cost|pricing|how much|plans?)/.test(msg))
+    return 'PRICING';
+
+  // Objections / comparisons
+  if (/(why should|why you|better than|different from|compare|vs\b)/.test(msg))
+    return 'OBJECTION';
+
+  // Feature / how it works
+  if (/(integrate|integration|how does|how it works|features?|capabilities)/.test(msg))
+    return 'FEATURE';
+
+  // Buying intent
+  if (/(sign up|get started|start now|book demo|schedule|trial)/.test(msg))
+    return 'BUYING';
+
+  return 'GENERAL';
+}
+
 // ─── Prompts ──────────────────────────────────────────────────────────────────
-const QUERY_REWRITE_PROMPT = `Generate 2-3 search variations for this question to capture different angles.
-Keep each variation focused and 5-15 words.
+const QUERY_REWRITE_PROMPT = `
+You are a semantic retrieval strategist for a modern SaaS AI system.
 
-User question: {question}
+Your task:
+Generate up to 2 alternative search queries that improve knowledge retrieval
+while preserving the user's exact intent.
 
-Output format (one per line):
-1. [variation]
-2. [variation]
-3. [variation]`;
+STRICT RULES:
+- Do NOT change meaning
+- Preserve product names, brands, and proper nouns
+- Do NOT introduce new assumptions
+- Each variation must explore a different angle (features, pricing, use case, comparison, problem)
+- 5-12 words each
+- No filler words
+- No explanations
 
-const RAG_ANSWER_PROMPT = `You are a helpful assistant. Answer the user's question using ONLY the CONTEXT provided below.
+User question:
+"{question}"
 
-RESPONSE RULES:
-1. Use information from the context — be specific about products, prices, features, or details mentioned
-2. If context is partially relevant, use what applies and acknowledge what you don't know
-3. Keep answers concise but complete — aim for 3-6 sentences or a short list
-4. Use a warm, conversational tone — like a knowledgeable shop assistant
+Output format:
+One variation per line
+No numbering
+No extra text
+`;
+const RAG_ANSWER_PROMPT = `
+You are a senior AI product advisor at a modern SaaS company.
 
-HTML FORMATTING (strictly follow):
-- Wrap every paragraph in <p> tags
-- Use <ul><li> for lists — no extra newlines between <li> items
-- Use <strong> only for product names or key terms
-- NO <br> tags, NO blank lines between elements
-- Output compact HTML only — no markdown, no plain text
+You speak like a real human founder — calm, confident, precise.
+Never sound robotic. Never sound scripted.
 
-SOURCE CITATION RULES:
-- Each context chunk starts with a label like: [Chunk 1 | Source: Page Title (https://example.com/page/)]
-- When you use information from a chunk that has a URL in its label, add an inline citation tag immediately after the sentence
-- Citation format: <cite data-url="FULL_URL">Page Title</cite>
-- Place the cite tag INSIDE the <p> or <li>, at the END of the sentence that uses that info
-- Example: <li><strong>Kids Books</strong>: Over 50 books for ages 3-12. <cite data-url="https://example.com/books/">Fun Learning Books</cite></li>
-- Only use URLs that APPEAR in the context labels — never invent or guess URLs
-- If a chunk has no URL in its label, do not add a citation for it
+You MUST answer using ONLY the provided CONTEXT.
+You are strictly forbidden from adding external knowledge.
 
-FOLLOW-UP RULE:
-- End with exactly ONE relevant follow-up question
-- Wrap it in: <p class="follow-up-question">...</p>
-- Must be the very last element
+Detected user intent: {intent}
 
+────────────────────────
+BEHAVIOR RULES
+────────────────────────
+• Greeting → short, warm, natural (1-2 sentences max)
+• Pricing → direct and transparent
+• Objection → acknowledge concern calmly, explain differentiator clearly, avoid vague marketing claims, be specific
+• Feature question → structured explanation
+• Buying intent → guide next step naturally
+• Vague question → ask one smart clarification
+
+Never use:
+- "industry leading"
+- "cutting-edge"
+- "thousands of satisfied clients"
+Unless explicitly present in context.
+
+If specific information is not available:
+- Acknowledge naturally
+- Offer clarification
+- Or guide toward the next step
+Never abruptly shut down the conversation.
+Never reject greetings or small talk.
+
+Do NOT say:
+- "based on the provided context"
+- "as an AI"
+
+────────────────────────
+HTML FORMAT (STRICT)
+────────────────────────
+- Wrap paragraphs in <p>
+- Use <ul><li> if needed
+- No markdown
+- No <br>
+- Compact HTML only
+
+────────────────────────
 CONTEXT:
 {context}
 
 CONVERSATION HISTORY:
 {history}
 
-USER: {question}
+USER QUESTION:
+{question}
 
-Output ONLY compact HTML. Answer first with inline citations where applicable, then one follow-up question:`;
+Return ONLY clean HTML.
+`;
 
-const GENERAL_ANSWER_PROMPT = `{systemPrompt}
+const GENERAL_ANSWER_PROMPT = `
+{systemPrompt}
 
-You're having a conversation with a user. They may ask about services, features, or general questions.
+You are continuing an ongoing SaaS conversation.
 
-CRITICAL FORMATTING RULES - FOLLOW EXACTLY:
-- Wrap each paragraph in <p> tags with NO extra newlines
-- Use <ul><li> for bullet lists (NO newlines between items)
-- Use <strong> only for truly important keywords
-- DO NOT add extra <br> tags or newlines
-- DO NOT add blank lines between elements
-- Keep HTML compact and clean
+Detected user intent: {intent}
+
+Be natural. Be human. Be concise.
+Avoid marketing tone.
+Avoid long monologues.
+
+
+HTML Rules:
+- Wrap text in <p>
+- Use <ul><li> if needed
+- No markdown
+- No <br>
+- Compact HTML only
 
 CONVERSATION HISTORY:
 {history}
 
+AVAILABLE ACTIONS:
 {logicContext}
 
-USER: {question}
+USER:
+{question}
 
-ASSISTANT - Output ONLY clean, compact HTML with no extra spacing:`;
+Return ONLY clean HTML.
+`;
 
 // ─── rewriteQuery ─────────────────────────────────────────────────────────────
 export async function rewriteQuery(userMessage: string): Promise<string[]> {
@@ -316,15 +399,30 @@ export async function getLogicContext(chatbot: any, message: string, preloadedLo
 }
 
 function generateSystemPrompt(chatbot: any): string {
-  const base = chatbot.directive || "You are a helpful, knowledgeable assistant.";
-  const personality = chatbot.description ? `\n\nYour personality: ${chatbot.description}` : "";
-  const guidelines = `\n\nGuidelines:
-- Be conversational and helpful
-- Provide specific details when available
-- If you're unsure, say so clearly
-- Stay professional but friendly
-- Format responses in HTML for better readability`;
-  return `${base}${personality}${guidelines}`;
+  return `
+You are a senior customer success and product specialist for a modern AI SaaS company.
+
+Your responsibilities:
+- Clearly explain services
+- Build trust through transparency
+- Guide users toward the right solution
+- Keep answers structured and helpful
+
+Communication style:
+- Natural and human
+- Calm and confident
+- Clear and concise
+- No hype
+- No buzzwords
+- No robotic apologies
+
+
+Company context:
+${chatbot.directive || ''}
+
+Brand personality:
+${chatbot.description || 'Professional, modern, and helpful.'}
+`;
 }
 
 export async function checkLogicTriggers(chatbot: any, message: string, preloadedLogic?: any) {
@@ -536,6 +634,49 @@ export async function generateRAGResponse(
 
   const formattedHistory = formatHistory(history);
 
+// Improved follow-up expansion logic
+let enrichedUserMessage = userMessage;
+
+const shortFollowUpPatterns = /^(why|how|pricing|cost|tell me more|more|what about that|and that|so)\b/i;
+
+if (
+  history.length > 0 &&
+  (
+    userMessage.trim().length <= 18 ||
+    shortFollowUpPatterns.test(userMessage.trim())
+  )
+) {
+  const lastAssistant = [...history].reverse().find(m => m.senderType === 'BOT');
+
+  if (lastAssistant) {
+    enrichedUserMessage = `
+User follow-up question:
+"${userMessage}"
+
+This refers to the previous assistant response:
+${lastAssistant.content}
+`;
+  }
+}
+
+  const intent = detectIntent(userMessage);
+  // ── GREETING FAST PATH (Skip RAG + LLM heavy flow) ──
+if (intent === 'GREETING') {
+  const greetingText = `<p>Hi there 👋 How can I help you today?</p>`;
+
+  return {
+    response: greetingText,
+    htmlResponse: `<div style="line-height:1.6;color:#1f2937;">${greetingText}</div>`,
+    conversationId,
+    knowledgeContext: '',
+    logicContext: '',
+    sourcesUsed: 0,
+    sourceUrls: []
+  };
+}
+
+
+
   // STEP 2: Smart vector search — original query first, only expand if needed
   const tStep2 = timer(`Step 2: vector search (smart, ${chatbot.knowledgeBases?.length ?? 0} KBs)`);
   
@@ -559,7 +700,9 @@ export async function generateRAGResponse(
   )).flat();
   tPhase2a.end();
 
-  const bestScore = searchresults.reduce((max, r) => Math.max(max, r.score ?? 0), 0);
+  // Confidence threshold — avoid forced robotic RAG
+const bestScore = searchresults.reduce((max, r) => Math.max(max, r.score ?? 0), 0);
+
   console.log(`   └─ ${searchresults.length} results, best score: ${bestScore.toFixed(3)}`);
 
   tStep2.end();
@@ -569,33 +712,59 @@ export async function generateRAGResponse(
   tProcess.end();
 
   console.log(`   └─ knowledgeContext length: ${knowledgeContext.length} chars, sources: ${sources.length}`);
-
+    
+  const strongContext = bestScore >= 0.45 && knowledgeContext.length > 0;
+     
   // STEP 3: LLM generation
-  const prompt = knowledgeContext
-    ? RAG_ANSWER_PROMPT
-        .replace('{context}', knowledgeContext)
-        .replace('{history}', formattedHistory)
-        .replace('{question}', userMessage)
-    : GENERAL_ANSWER_PROMPT
-        .replace('{systemPrompt}', generateSystemPrompt(chatbot))
-        .replace('{history}', formattedHistory)
-        .replace('{logicContext}', logicContext)
-        .replace('{question}', userMessage);
+  
+const prompt = strongContext
+  ? RAG_ANSWER_PROMPT
+      .replace('{intent}', intent)
+      .replace('{context}', knowledgeContext)
+      .replace('{history}', formattedHistory)
+      .replace('{question}', enrichedUserMessage)
+  : GENERAL_ANSWER_PROMPT
+      .replace('{intent}', intent)
+      .replace('{systemPrompt}', generateSystemPrompt(chatbot))
+      .replace('{history}', formattedHistory)
+      .replace('{logicContext}', logicContext)
+     .replace('{question}', enrichedUserMessage);
 
-  const tLLM = timer('Step 3: LLM generateText (gemini-3-flash-preview)');
-  const { text } = await generateText({
-    model: googleAI('gemini-2.5-flash'),  // fast, stable, low-latency
-    prompt,
-    maxOutputTokens: chatbot.max_tokens || 400,  // shorter = faster TTFT
-    temperature: chatbot.temperature || 0.7,
-  });
+  const tLLM = timer('Step 3: LLM generateText (gemini-2.5-flash-preview)');
+ // First generation (creative)
+const { text } = await generateText({
+  model: googleAI('gemini-2.5-flash'),
+  prompt,
+  maxOutputTokens: chatbot.max_tokens || 400,
+  temperature: chatbot.temperature ?? 0.82,
+});
+
+
   tLLM.end();
 
   console.log(`   └─ LLM output length: ${text.length} chars`);
 
   const tHtml = timer('Step 4: cleanHtml + appendReadMore');
-  const htmlResponse = appendReadMoreSection(cleanHtmlResponse(ensureHtmlFormat(text)), sources);
-  tHtml.end();
+let cleaned = cleanHtmlResponse(ensureHtmlFormat(text));
+
+const isFallback = false;
+
+const isKnowledgeIntent =
+  intent === 'FEATURE' ||
+  intent === 'GENERAL';
+
+const shortMessage = userMessage.trim().length < 20;
+
+const shouldShowSources =
+  strongContext &&
+  isKnowledgeIntent &&
+  !shortMessage &&
+  cleaned.length > 120;
+
+const htmlResponse = shouldShowSources
+  ? appendReadMoreSection(cleaned, sources)
+  : cleaned;
+    tHtml.end();
 
   tTotal.end();
   console.groupEnd();
@@ -845,6 +1014,16 @@ export async function streamRAGResponse(
   tHistory.end();
 
   const formattedHistory = formatHistory(history);
+  const intent = detectIntent(userMessage);
+  if (intent === 'GREETING') {
+  const greeting = `<p>Hi there 👋 How can I help you today?</p>`;
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(greeting);
+      controller.close();
+    }
+  });
+}
 
   const tRewrite = timer('rewriteQuery');
   const queries = await rewriteQuery(userMessage);
@@ -859,22 +1038,24 @@ export async function streamRAGResponse(
   tLogic.end();
 
   const prompt = knowledgeContext
-    ? RAG_ANSWER_PROMPT
-        .replace('{context}', knowledgeContext)
-        .replace('{history}', formattedHistory)
-        .replace('{question}', userMessage)
-    : GENERAL_ANSWER_PROMPT
-        .replace('{systemPrompt}', generateSystemPrompt(chatbot))
-        .replace('{history}', formattedHistory)
-        .replace('{logicContext}', logicContext)
-        .replace('{question}', userMessage);
+  ? RAG_ANSWER_PROMPT
+      .replace('{intent}', intent)
+      .replace('{context}', knowledgeContext)
+      .replace('{history}', formattedHistory)
+      .replace('{question}', userMessage)
+  : GENERAL_ANSWER_PROMPT
+      .replace('{intent}', intent)
+      .replace('{systemPrompt}', generateSystemPrompt(chatbot))
+      .replace('{history}', formattedHistory)
+      .replace('{logicContext}', logicContext)
+      .replace('{question}', userMessage);
 
   const tStreamInit = timer('streamText init (LLM call start)');
   const result = await streamText({
     model: googleAI('gemini-2.5-flash'),  // fast, stable, low-latency
     prompt,
     maxOutputTokens: chatbot.max_tokens || 400,
-    temperature: chatbot.temperature || 0.7,
+    temperature: chatbot.temperature ?? 0.82,
   });
   tStreamInit.end();
 
