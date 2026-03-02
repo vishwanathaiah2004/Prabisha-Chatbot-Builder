@@ -595,6 +595,49 @@ export async function generateRAGResponse(
 
   const formattedHistory = formatHistory(history);
 
+// Improved follow-up expansion logic
+let enrichedUserMessage = userMessage;
+
+const shortFollowUpPatterns = /^(why|how|pricing|cost|tell me more|more|what about that|and that|so)\b/i;
+
+if (
+  history.length > 0 &&
+  (
+    userMessage.trim().length <= 18 ||
+    shortFollowUpPatterns.test(userMessage.trim())
+  )
+) {
+  const lastAssistant = [...history].reverse().find(m => m.senderType === 'BOT');
+
+  if (lastAssistant) {
+    enrichedUserMessage = `
+User follow-up question:
+"${userMessage}"
+
+This refers to the previous assistant response:
+${lastAssistant.content}
+`;
+  }
+}
+
+  const intent = detectIntent(userMessage);
+  // ── GREETING FAST PATH (Skip RAG + LLM heavy flow) ──
+if (intent === 'GREETING') {
+  const greetingText = `<p>Hi there 👋 How can I help you today?</p>`;
+
+  return {
+    response: greetingText,
+    htmlResponse: `<div style="line-height:1.6;color:#1f2937;">${greetingText}</div>`,
+    conversationId,
+    knowledgeContext: '',
+    logicContext: '',
+    sourcesUsed: 0,
+    sourceUrls: []
+  };
+}
+
+
+
   // STEP 2: Smart vector search — original query first, only expand if needed
   const tStep2 = timer(`Step 2: vector search (smart, ${chatbot.knowledgeBases?.length ?? 0} KBs)`);
   
@@ -618,7 +661,9 @@ export async function generateRAGResponse(
   )).flat();
   tPhase2a.end();
 
-  const bestScore = searchresults.reduce((max, r) => Math.max(max, r.score ?? 0), 0);
+  // Confidence threshold — avoid forced robotic RAG
+const bestScore = searchresults.reduce((max, r) => Math.max(max, r.score ?? 0), 0);
+
   console.log(`   └─ ${searchresults.length} results, best score: ${bestScore.toFixed(3)}`);
 
   tStep2.end();
@@ -628,33 +673,59 @@ export async function generateRAGResponse(
   tProcess.end();
 
   console.log(`   └─ knowledgeContext length: ${knowledgeContext.length} chars, sources: ${sources.length}`);
-
+    
+  const strongContext = bestScore >= 0.45 && knowledgeContext.length > 0;
+     
   // STEP 3: LLM generation
-  const prompt = knowledgeContext
-    ? RAG_ANSWER_PROMPT
-        .replace('{context}', knowledgeContext)
-        .replace('{history}', formattedHistory)
-        .replace('{question}', userMessage)
-    : GENERAL_ANSWER_PROMPT
-        .replace('{systemPrompt}', generateSystemPrompt(chatbot))
-        .replace('{history}', formattedHistory)
-        .replace('{logicContext}', logicContext)
-        .replace('{question}', userMessage);
+  
+const prompt = strongContext
+  ? RAG_ANSWER_PROMPT
+      .replace('{intent}', intent)
+      .replace('{context}', knowledgeContext)
+      .replace('{history}', formattedHistory)
+      .replace('{question}', enrichedUserMessage)
+  : GENERAL_ANSWER_PROMPT
+      .replace('{intent}', intent)
+      .replace('{systemPrompt}', generateSystemPrompt(chatbot))
+      .replace('{history}', formattedHistory)
+      .replace('{logicContext}', logicContext)
+     .replace('{question}', enrichedUserMessage);
 
-  const tLLM = timer('Step 3: LLM generateText (gemini-3-flash-preview)');
-  const { text } = await generateText({
-    model: googleAI('gemini-2.5-flash'),  // fast, stable, low-latency
-    prompt,
-    maxOutputTokens: chatbot.max_tokens || 400,  // shorter = faster TTFT
-    temperature: chatbot.temperature || 0.7,
-  });
+  const tLLM = timer('Step 3: LLM generateText (gemini-2.5-flash-preview)');
+ // First generation (creative)
+const { text } = await generateText({
+  model: googleAI('gemini-2.5-flash'),
+  prompt,
+  maxOutputTokens: chatbot.max_tokens || 400,
+  temperature: chatbot.temperature ?? 0.82,
+});
+
+
   tLLM.end();
 
   console.log(`   └─ LLM output length: ${text.length} chars`);
 
   const tHtml = timer('Step 4: cleanHtml + appendReadMore');
-  const htmlResponse = appendReadMoreSection(cleanHtmlResponse(ensureHtmlFormat(text)), sources);
-  tHtml.end();
+let cleaned = cleanHtmlResponse(ensureHtmlFormat(text));
+
+const isFallback = false;
+
+const isKnowledgeIntent =
+  intent === 'FEATURE' ||
+  intent === 'GENERAL';
+
+const shortMessage = userMessage.trim().length < 20;
+
+const shouldShowSources =
+  strongContext &&
+  isKnowledgeIntent &&
+  !shortMessage &&
+  cleaned.length > 120;
+
+const htmlResponse = shouldShowSources
+  ? appendReadMoreSection(cleaned, sources)
+  : cleaned;
+    tHtml.end();
 
   tTotal.end();
   console.groupEnd();
@@ -904,6 +975,16 @@ export async function streamRAGResponse(
   tHistory.end();
 
   const formattedHistory = formatHistory(history);
+  const intent = detectIntent(userMessage);
+  if (intent === 'GREETING') {
+  const greeting = `<p>Hi there 👋 How can I help you today?</p>`;
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(greeting);
+      controller.close();
+    }
+  });
+}
 
   const tRewrite = timer('rewriteQuery');
   const queries = await rewriteQuery(userMessage);
@@ -918,22 +999,24 @@ export async function streamRAGResponse(
   tLogic.end();
 
   const prompt = knowledgeContext
-    ? RAG_ANSWER_PROMPT
-        .replace('{context}', knowledgeContext)
-        .replace('{history}', formattedHistory)
-        .replace('{question}', userMessage)
-    : GENERAL_ANSWER_PROMPT
-        .replace('{systemPrompt}', generateSystemPrompt(chatbot))
-        .replace('{history}', formattedHistory)
-        .replace('{logicContext}', logicContext)
-        .replace('{question}', userMessage);
+  ? RAG_ANSWER_PROMPT
+      .replace('{intent}', intent)
+      .replace('{context}', knowledgeContext)
+      .replace('{history}', formattedHistory)
+      .replace('{question}', userMessage)
+  : GENERAL_ANSWER_PROMPT
+      .replace('{intent}', intent)
+      .replace('{systemPrompt}', generateSystemPrompt(chatbot))
+      .replace('{history}', formattedHistory)
+      .replace('{logicContext}', logicContext)
+      .replace('{question}', userMessage);
 
   const tStreamInit = timer('streamText init (LLM call start)');
   const result = await streamText({
     model: googleAI('gemini-2.5-flash'),  // fast, stable, low-latency
     prompt,
     maxOutputTokens: chatbot.max_tokens || 400,
-    temperature: chatbot.temperature || 0.7,
+    temperature: chatbot.temperature ?? 0.82,
   });
   tStreamInit.end();
 
