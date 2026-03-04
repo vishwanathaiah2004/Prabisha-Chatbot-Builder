@@ -410,12 +410,14 @@ function ChatBot({
     else showLeadForm();
   };
 
-  // overflow-hidden on the shell is the outermost x-overflow guard
+  const primaryLight = chatbot.theme?.primaryLight || '#E6F0FF'; // light blue
+  const borderColor = chatbot.theme?.borderColor || '#D6E4FF';
+
   const shellClass = [
     isMobile || isEmbedded
       ? 'w-full h-full rounded-none'
-      : 'w-[95vw] sm:w-96 md:w-[480px] h-150 rounded-xl',
-    'bg-background flex flex-col border shadow-2xl relative overflow-hidden',
+      : 'w-[95vw] sm:w-[420px] h-[600px] rounded-2xl',
+    'flex flex-col relative overflow-hidden',
   ].join(' ');
 
   const positionClass = isEmbedded
@@ -444,6 +446,10 @@ function ChatBot({
             'transition-all duration-300 ease-out',
             isClosing ? 'animate-out slide-out-to-bottom-full' : 'animate-in slide-in-from-bottom-full',
           ].join(' ')}
+          style={{
+            backgroundColor: primaryLight,
+            border: `1px solid ${borderColor}`,
+          }}
         >
           <ChatHeader
             onClose={handleClose}
@@ -523,73 +529,101 @@ function ChatBot({
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ChatHeader
-// ─────────────────────────────────────────────────────────────────────────────
-
 function ChatHeader({
-  onClose, chatbot, isMobile, isEmbedded,
+  onClose,
+  chatbot,
+  isMobile,
+  isEmbedded,
 }: {
   onClose: () => void;
   chatbot: any;
   isMobile?: boolean;
   isEmbedded?: boolean;
 }) {
-  const t = chatbot.theme;
+  const headerBg = chatbot?.theme?.primaryColor || '#3B82F6'; // Light Blue default
+  const headerText = chatbot?.theme?.headerTextColor || '#ffffff';
+  const accentColor = chatbot?.theme?.inputButtonColor || '#F97316'; // light orange
   return (
     <div
       className={[
-        'flex items-center justify-between px-4 py-4 shadow-md backdrop-blur-md',
-        isMobile || isEmbedded ? 'rounded-none' : 'rounded-t-xl',
+        'flex items-center justify-between px-5 py-4 border-b border-black/10',
+        isMobile || isEmbedded ? 'rounded-none' : 'rounded-t-2xl',
       ].join(' ')}
       style={{
-        background: `linear-gradient(135deg, ${t?.headerBgColor || '#1320AA'}, #1e40af)`,
-        color: t?.headerTextColor || '#ffffff',
+        backgroundColor: headerBg,
+        color: headerText,
       }}
     >
-
-      <div className="max-w-20 shrink-0 p-3">
+      {/* Left Section */}
+      <div className="flex items-center gap-4 min-w-0">
         <Image
           src={chatbot.avatar || '/icons/logo.png'}
-          height={64} width={64}
+          height={48}
+          width={48}
           alt={chatbot.name || 'Assistant'}
-          className="h-12 w-12 rounded-full object-cover border border-gray-200 shadow-sm"
+          className="h-12 w-12 rounded-xl object-cover border border-black/10"
           unoptimized
         />
-      </div>
-      <div className="grow flex flex-col justify-center py-4 pr-12 min-w-0">
 
-        {/* Name + Live Indicator */}
-        <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-base truncate leading-tight tracking-tight">
-            {chatbot.name || 'Assistant'}
-          </h3>
+        <div className="min-w-0">
+          {/* Name + Live */}
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-semibold truncate">
+              {chatbot.name || 'Customer Support'}
+            </h3>
 
-          {/* Live Online Dot */}
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
-          </span>
+            {/* Live Indicator */}
+            <span className="flex items-center gap-1.5">
+              <span className="relative flex h-2.5 w-2.5">
+                <span
+                  className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-50"
+                  style={{
+                    animation: 'softPulse 2s ease-in-out infinite',
+                  }}
+                ></span>
+
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]"></span>
+              </span>
+
+              <span className="text-xs font-semibold truncate tracking-wide">
+                Live
+              </span>
+
+              <style jsx>{`
+    @keyframes softPulse {
+      0% {
+        transform: scale(1);
+        opacity: 0.5;
+      }
+      50% {
+        transform: scale(1.8);
+        opacity: 0.2;
+      }
+      100% {
+        transform: scale(1);
+        opacity: 0.5;
+      }
+    }
+  `}</style>
+            </span>
+          </div>
+
+          <p
+           className="text-xs font-semibold truncate mt-0.5"
+            style={{ color: accentColor }}
+          >
+            {chatbot.description || 'Typically replies instantly'}
+          </p>
         </div>
-
-        {/* Subtitle */}
-        <p className="text-[11px] opacity-90 truncate mt-0.5 text-white/90">
-          {chatbot.description || 'Online • Typically replies instantly'}
-        </p>
-
       </div>
+
+      {/* Close Button */}
       <button
         onClick={onClose}
-        className="absolute top-3 right-3 z-50 transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+        className="h-9 w-9 rounded-full bg-[#F97316] text-white flex items-center justify-center hover:opacity-90 transition cursor-pointer"
         aria-label="Close chat"
       >
-        <div
-          className="rounded-full p-1.5 shadow-lg border-2 border-white flex items-center justify-center w-7 h-7"
-          style={{
-            backgroundColor: t?.closeButtonBgColor || '#DD692E',
-            color: t?.closeButtonColor || '#ffffff',
-          }}
-        >
-          <XIcon size={14} strokeWidth={3} />
-        </div>
+        <XIcon size={16} strokeWidth={2.5} />
       </button>
     </div>
   );
@@ -667,13 +701,16 @@ function ChatMessages({
   const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
 
   const t = chatbot.theme;
-  const botBg = t?.botMessageBgColor || '#f1f5f9';
-  const botText = t?.botMessageTextColor || '#0f172a';
-  const userBg = t?.userMessageBgColor || '#1320AA';
+  const botBg = t?.botMessageBgColor || '#FFFFFF';
+  const botText = t?.botMessageTextColor || '#1E293B';
+
+  const userBg = t?.userMessageBgColor || '#3B82F6'; // blue
   const userText = t?.userMessageTextColor || '#ffffff';
+
+  const accentColor = t?.inputButtonColor || '#F97316'; // orange
   const suggBg = t?.quickSuggestionBgColor || '#ffffff';
   const suggText = t?.quickSuggestionTextColor || '#0f172a';
-  const accentColor = t?.inputButtonColor || '#DD692E';
+  // const accentColor = t?.inputButtonColor || '#DD692E';
 
   const hasUserMessages = messages.some(m => m.senderType === 'USER');
   const hasMultipleMessages = messages.length >= 2;
@@ -860,7 +897,7 @@ function ChatMessages({
     */
     <div
       ref={chatContainerRef}
-      className="flex-1 overflow-y-auto overflow-x-hidden bg-gradient-to-b from-background to-muted/30 relative"
+      className="flex-1 overflow-y-auto overflow-x-hidden bg-linear-to-b from-background to-muted/30 relative"
     >
       <div className="p-4 space-y-6">
 
@@ -883,23 +920,31 @@ function ChatMessages({
 
         {/* Quick suggestions — only shown before first user message */}
         {!hasUserMessages && quickQuestions.length > 0 && (
-          <div className="mt-8 animate-in fade-in delay-300">
-            <p className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-              <Zap className="h-3 w-3" /> Quick suggestions
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {quickQuestions.map((q, i) => (
-                <button
-                  key={i}
-                  onClick={() => onQuickQuestion(q)}
-                  disabled={loading}
-                  className="group text-left p-3 rounded-xl border transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 cursor-pointer"
-                  style={{ backgroundColor: suggBg, color: suggText }}
-                >
-                  <span className="text-sm font-medium group-hover:opacity-80">{q}</span>
-                </button>
-              ))}
-            </div>
+          <div className="mt-6 flex flex-col gap-3">
+            {quickQuestions.map((q, i) => (
+              <button
+                key={i}
+                onClick={() => onQuickQuestion(q)}
+                disabled={loading}
+                className="
+          w-full
+          py-3
+          px-6
+          rounded-full
+          border-2
+          border-black
+          bg-white
+          text-black
+          text-sm
+          font-medium
+          transition-colors
+          hover:bg-black
+          hover:text-white
+        "
+              >
+                {q}
+              </button>
+            ))}
           </div>
         )}
 
@@ -939,6 +984,9 @@ function ChatInput({
   isAwaitingLeadAnswer, isConversationalMode, chatbot,
 }: ChatInputProps) {
   const accentColor = chatbot?.theme?.inputButtonColor || '#DD692E';
+  const primaryLight = chatbot?.theme?.primaryLight || '#E6F4FF'; // light blue shell
+  const inputBg = chatbot?.theme?.inputBgColor || '#FFF4E6'; // light orange
+  const borderColor = chatbot?.theme?.borderColor || '#D6E4FF';
   const [showPicker, setShowPicker] = useState(false);
 
   const onEmojiClick = (emojiData: EmojiClickData) => {
@@ -946,7 +994,13 @@ function ChatInput({
   };
 
   return (
-      <div className="border-t border-black/5 bg-white/80 backdrop-blur-xl px-4 py-4 shrink-0 relative">
+    <div
+      className="border-t px-4 py-4 shrink-0 relative transition-all duration-200"
+      style={{
+        backgroundColor: inputBg,
+        borderColor: borderColor,
+      }}
+    >
 
       {/* 1. Responsive Picker Container */}
       {showPicker && (
@@ -988,7 +1042,7 @@ function ChatInput({
           await onSubmit(e);
         }}
       >
-        <div className="flex items-end gap-2">
+        <div className="flex items-end gap-3">
           <div className="flex-1 min-w-0">
             <PromptInputTextarea
               ref={inputRef}
@@ -996,7 +1050,7 @@ function ChatInput({
               onChange={e => setText(e.target.value)}
               placeholder={isAwaitingLeadAnswer ? 'Type your answer…' : 'Type your message here…'}
               disabled={loading || isMicrophoneOn}
-              className="min-h-12 max-h-32 text-[13px]"
+              className="min-h-10 max-h-32 text-[14px] bg-white/60 backdrop-blur-sm rounded-lg px-3 py-2 resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
               rows={1}
             />
 
@@ -1033,6 +1087,10 @@ function ChatInput({
                   type="button"
                   size="sm"
                   variant="ghost"
+                  className={`rounded-full ${isMicrophoneOn
+                    ? 'bg-red-100 text-red-600'
+                    : 'hover:bg-gray-100'
+                    }`}
                   onClick={onNewChat}
                 >
                   <RefreshCw className="h-4 w-4" />
