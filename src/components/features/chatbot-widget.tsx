@@ -818,9 +818,9 @@ function ChatHeader({
   closeLabel: string;
   liveLabel: string;
 }) {
-  const headerBg = chatbot?.theme?.primaryColor || '#3B82F6';
+  const headerBg = chatbot?.theme?.primaryColor || '#111CA8';
   const headerText = chatbot?.theme?.headerTextColor || '#ffffff';
-  const accentColor = chatbot?.theme?.inputButtonColor || '#F97316';
+  const accentColor = chatbot?.theme?.inputButtonColor || '#DF6A2E';
 
   return (
     <div
@@ -875,7 +875,7 @@ function ChatHeader({
       {/* Close Button */}
       <button
         onClick={onClose}
-        className="h-9 w-9 rounded-full bg-[#F97316] text-white flex items-center justify-center hover:opacity-90 transition cursor-pointer"
+        className="h-9 w-9 rounded-full bg-[#DF6A2E] text-white flex items-center justify-center hover:opacity-90 transition cursor-pointer"
         aria-label={closeLabel}
       >
         <XIcon size={16} strokeWidth={2.5} />
@@ -910,7 +910,7 @@ function ChatToggleButton({ onClick, chatbot, openLabel }: { onClick: () => void
         width: `${size}px`,
         height: `${size}px`,
         backgroundColor: chatbot.theme?.widgetBgColor || '#FFFFFF',
-        border: `3px solid ${chatbot.theme?.widgetColor || '#3b82f6'}`,
+        border: `3px solid ${chatbot.theme?.widgetColor || '#111CA8'}`,
       }}
     >
       <Image
@@ -956,9 +956,9 @@ function ChatMessages({
   const th = chatbot.theme;
   const botBg = th?.botMessageBgColor || '#FFFFFF';
   const botText = th?.botMessageTextColor || '#1E293B';
-  const userBg = th?.userMessageBgColor || '#3B82F6';
+  const userBg = th?.userMessageBgColor || '#111CA8';
   const userText = th?.userMessageTextColor || '#ffffff';
-  const accentColor = th?.inputButtonColor || '#F97316';
+  const accentColor = th?.inputButtonColor || '#DF6A2E';
 
   const hasUserMessages = messages.some(m => m.senderType === 'USER');
   const hasMultipleMessages = messages.length >= 2;
