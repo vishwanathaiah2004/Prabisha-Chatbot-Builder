@@ -203,12 +203,12 @@ interface ChatbotWidgetProps {
 }
 
 const LANGUAGES = [
-  { name: 'English',  code: 'en', img: '/flags/en.svg', dir: 'ltr' },
-  { name: '日本語',    code: 'ja', img: '/flags/ja.svg', dir: 'ltr' },
-  { name: 'हिन्दी',    code: 'hi', img: '/flags/hi.svg', dir: 'ltr' },
+  { name: 'English', code: 'en', img: '/flags/en.svg', dir: 'ltr' },
+  { name: '日本語', code: 'ja', img: '/flags/ja.svg', dir: 'ltr' },
+  { name: 'हिन्दी', code: 'hi', img: '/flags/hi.svg', dir: 'ltr' },
   { name: 'Français', code: 'fr', img: '/flags/fr.svg', dir: 'ltr' },
-  { name: 'Español',  code: 'es', img: '/flags/es.svg', dir: 'ltr' },
-  { name: 'العربية',  code: 'ar', img: '/flags/ar.svg', dir: 'rtl' },
+  { name: 'Español', code: 'es', img: '/flags/es.svg', dir: 'ltr' },
+  { name: 'العربية', code: 'ar', img: '/flags/ar.svg', dir: 'rtl' },
 ] as const;
 
 type LanguageCode = typeof LANGUAGES[number]['code'];
@@ -762,13 +762,26 @@ function ChatBot({
             setText={setText}
             loading={loading}
             isMicrophoneOn={isMicrophoneOn}
-            browserSupportsSpeechRecognition={browserSupportsSpeechRecognition}
+            browserSupportsSpeechRecognition={
+              browserSupportsSpeechRecognition &&
+              !policyBlocked &&
+              !parentPolicyInfo?.blocked &&
+              parentPolicyInfo?.permission !== 'denied'
+            }
             onSubmit={handleSubmit}
             onNewChat={handleNewChat}
             status={status}
             inputRef={inputRef}
             onToggleMicrophone={() => {
-              if (browserSupportsSpeechRecognition) setIsMicrophoneOn(p => !p);
+              const micAllowed =
+                browserSupportsSpeechRecognition &&
+                !policyBlocked &&
+                !parentPolicyInfo?.blocked &&
+                parentPolicyInfo?.permission !== 'denied';
+
+              if (micAllowed) {
+                setIsMicrophoneOn(p => !p);
+              }
             }}
             hasLeadForm={!hasSubmittedLead && !!activeLeadForm}
             onLeadAction={handleLeadAction}
@@ -1237,15 +1250,15 @@ function ChatInput({
           await onSubmit(e);
         }}
       >
-        <div className="flex items-end gap-3">
-          <div className="flex-1 min-w-0">
+      <div className="flex items-stretch gap-2 w-full">
+         <div className="flex flex-col flex-1 min-w-0 w-full">
             <PromptInputTextarea
               ref={inputRef}
               value={text}
               onChange={e => setText(e.target.value)}
               placeholder={isAwaitingLeadAnswer ? t('typeAnswer') : t('typeMessage')}
               disabled={loading || isMicrophoneOn}
-              className="min-h-10 max-h-32 text-[14px] bg-white/60 backdrop-blur-sm rounded-lg px-3 py-2 resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
+              className="min-h-10 max-h-32 w-full text-[14px] bg-white/60 backdrop-blur-sm rounded-lg px-3 py-2 resize-none focus-visible:ring-0 focus-visible:ring-offset-0"
               rows={1}
             />
 
@@ -1302,7 +1315,7 @@ function ChatInput({
             size="icon"
             disabled={(!text.trim() && !isMicrophoneOn) || loading}
             status={status}
-            className="h-12 w-12 rounded-full m-1 shadow-lg hover:scale-105 transition-all"
+            className="h-12 w-12 shrink-0 rounded-full m-1 shadow-lg hover:scale-105 transition-all"
             style={{ backgroundColor: accentColor, color: '#ffffff' }}
           >
             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
