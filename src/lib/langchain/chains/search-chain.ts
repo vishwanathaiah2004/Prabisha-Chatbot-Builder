@@ -11,7 +11,14 @@ export interface SearchChainConfig {
   model?: string;
   maxTokens?: number;
   temperature?: number;
-  chatbot?: any; // ← pass pre-fetched chatbot to avoid double DB hit
+  chatbot?: any;
+  /**
+   * BCP-47 language code (e.g. 'en', 'ja', 'hi', 'fr', 'es', 'ar').
+   * The AI will always respond in this language regardless of what language
+   * the knowledge-base content or system prompt is written in.
+   * Defaults to 'en'.
+   */
+  language?: string;
 }
 
 export interface SearchChainResult {
@@ -41,6 +48,34 @@ function timer(label: string) {
   };
 }
 
+// ─── Language directive ───────────────────────────────────────────────────────
+/**
+ * Returns a hard language instruction that is prepended to every prompt.
+ * Using BCP-47 names so the model can't misinterpret a bare code like "ar".
+ */
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: 'English',
+  ja: 'Japanese (日本語)',
+  hi: 'Hindi (हिन्दी)',
+  fr: 'French (Français)',
+  es: 'Spanish (Español)',
+  ar: 'Arabic (العربية)',
+};
+
+function languageDirective(language: string): string {
+  const name = LANGUAGE_NAMES[language] ?? language;
+  return `\
+────────────────────────
+LANGUAGE RULE (HIGHEST PRIORITY)
+────────────────────────
+You MUST respond exclusively in ${name}.
+Do NOT switch languages for any reason — even if the source documents,
+conversation history, or user message are in a different language.
+All output HTML, labels, and prose must be in ${name}.
+
+`;
+}
+
 // ─── Prompts ──────────────────────────────────────────────────────────────────
 const QUERY_REWRITE_PROMPT = `
 You are an expert search query optimizer for a semantic vector database.
@@ -66,6 +101,7 @@ Output format (plain text, one per line, no numbering):
 `;
 
 const RAG_ANSWER_PROMPT = `
+{languageDirective}
 You are a domain-specific AI assistant.
 
 You MUST answer using ONLY the provided CONTEXT.
@@ -136,6 +172,7 @@ Return ONLY clean, compact HTML.
 `;
 
 const GENERAL_ANSWER_PROMPT = `
+{languageDirective}
 {systemPrompt}
 
 You are responding in an ongoing conversation.
@@ -173,7 +210,6 @@ Return ONLY clean, compact HTML.
 
 // ─── rewriteQuery ─────────────────────────────────────────────────────────────
 export async function rewriteQuery(userMessage: string): Promise<string[]> {
-  // Skip rewriting for short queries — saves ~2s and 2 extra embedding calls downstream
   if (userMessage.trim().split(/\s+/).length <= 5) {
     console.log('⚡ [rewriteQuery] short query — skipping rewrite, using original only');
     return [userMessage];
@@ -182,7 +218,7 @@ export async function rewriteQuery(userMessage: string): Promise<string[]> {
   const t = timer('rewriteQuery (LLM call)');
   try {
     const { text } = await generateText({
-      model: googleAI('gemini-2.5-flash'),  // faster than 2.5-flash for this tiny task
+      model: googleAI('gemini-2.5-flash'),
       prompt: QUERY_REWRITE_PROMPT.replace('{question}', userMessage),
       maxOutputTokens: 100,
       temperature: 0.3,
@@ -194,9 +230,9 @@ export async function rewriteQuery(userMessage: string): Promise<string[]> {
       .filter(line => line.trim())
       .map(line => line.replace(/^\d+\.\s*/, '').trim())
       .filter(v => v.length > 0)
-      .slice(0, 2); // max 2 variations, not 3 — reduces downstream search calls
+      .slice(0, 2);
 
-    const queries = [userMessage, ...variations].slice(0, 2); // cap at 2 total
+    const queries = [userMessage, ...variations].slice(0, 2);
     console.log('🔄 Query variations:', queries);
     return queries;
   } catch (error) {
@@ -476,7 +512,6 @@ function cleanHtmlResponse(html: string): string {
   cleaned = cleaned.replace(/<li>/g, '<li style="margin-bottom: 6px;">');
   cleaned = cleaned.replace(/^<p style="margin-top: 12px;">/, '<p>');
 
-  // Convert LLM <cite data-url="...">label</cite> → styled inline link
   cleaned = cleaned.replace(
     /<cite data-url="([^"]+)">([^<]+)<\/cite>/g,
     (_, url, label) =>
@@ -522,18 +557,15 @@ function appendReadMoreSection(
 ): string {
   if (!sources.length) return htmlResponse;
 
-  // Deduplicate: skip sources already shown as inline <cite> links in the response
   const inlineCiteUrls = new Set<string>();
   const citeRegex = /data-url="([^"]+)"/g;
   let match;
   while ((match = citeRegex.exec(htmlResponse)) !== null) {
     inlineCiteUrls.add(match[1]);
   }
-  const newSources = sources.filter(s => !inlineCiteUrls.has(s.url));
 
-  // Build source cards for sources NOT already shown inline
-  const allSourcesToShow = sources; // always show all in the footer section
-  
+  const allSourcesToShow = sources;
+
   const sourceItems = allSourcesToShow.map((source) => {
     let hostname = '';
     try { hostname = new URL(source.url).hostname.replace('www.', ''); } catch {}
@@ -568,13 +600,11 @@ type IntentType = 'GREETING' | 'FEATURE' | 'GENERAL';
 function detectIntent(message: string): IntentType {
   const text = message.trim().toLowerCase();
 
-  // Greeting detection
   const greetings = ['hi', 'hello', 'hey', 'good morning', 'good evening'];
   if (greetings.some(g => text === g || text.startsWith(g + ' '))) {
     return 'GREETING';
   }
 
-  // Feature / knowledge style questions
   if (
     text.includes('feature') ||
     text.includes('pricing') ||
@@ -594,12 +624,15 @@ export async function generateRAGResponse(
   chatbot: any,
   userMessage: string,
   conversationId: string,
-  preloadedChatbotLogic?: any   // ← pass in from executeSearchChain to skip DB call
+  preloadedChatbotLogic?: any,
+  language = 'en'             // ← new param, safe default
 ): Promise<SearchChainResult> {
   console.group('🔍 generateRAGResponse');
   const tTotal = timer('generateRAGResponse [total]');
 
-  // STEP 1: Parallel — history + query rewrite + chatbotLogic (only if not preloaded)
+  const langDirective = languageDirective(language);
+
+  // STEP 1: Parallel — history + query rewrite + chatbotLogic
   const tStep1 = timer('Step 1: history + rewriteQuery + chatbotLogic (parallel)');
   const [history, queries, chatbotLogic] = await Promise.all([
     prisma.message.findMany({
@@ -609,68 +642,81 @@ export async function generateRAGResponse(
     }),
     rewriteQuery(userMessage),
     preloadedChatbotLogic
-      ? Promise.resolve(preloadedChatbotLogic)   // already have it — free
+      ? Promise.resolve(preloadedChatbotLogic)
       : prisma.chatbotLogic.findUnique({ where: { chatbotId: chatbot.id } })
   ]);
   tStep1.end();
 
-  // Derive logicContext — no DB call (reusing chatbotLogic fetched above)
   const tLogicCtx = timer('getLogicContext (reusing prefetched logic)');
   const logicContext = await getLogicContext(chatbot, userMessage, chatbotLogic);
   tLogicCtx.end();
 
   const formattedHistory = formatHistory(history);
 
-// Improved follow-up expansion logic
-let enrichedUserMessage = userMessage;
+  let enrichedUserMessage = userMessage;
+  const shortFollowUpPatterns = /^(why|how|pricing|cost|tell me more|more|what about that|and that|so)\b/i;
 
-const shortFollowUpPatterns = /^(why|how|pricing|cost|tell me more|more|what about that|and that|so)\b/i;
-
-if (
-  history.length > 0 &&
-  (
-    userMessage.trim().length <= 18 ||
-    shortFollowUpPatterns.test(userMessage.trim())
-  )
-) {
-  const lastAssistant = [...history].reverse().find(m => m.senderType === 'BOT');
-
-  if (lastAssistant) {
-    enrichedUserMessage = `
+  if (
+    history.length > 0 &&
+    (userMessage.trim().length <= 18 || shortFollowUpPatterns.test(userMessage.trim()))
+  ) {
+    const lastAssistant = [...history].reverse().find(m => m.senderType === 'BOT');
+    if (lastAssistant) {
+      enrichedUserMessage = `
 User follow-up question:
 "${userMessage}"
 
 This refers to the previous assistant response:
 ${lastAssistant.content}
 `;
+    }
   }
-}
 
   const intent = detectIntent(userMessage);
-  // ── GREETING FAST PATH (Skip RAG + LLM heavy flow) ──
-if (intent === 'GREETING') {
-  const greetingText = `<p>Hi there 👋 How can I help you today?</p>`;
 
-  return {
-    response: greetingText,
-    htmlResponse: `<div style="line-height:1.6;color:#1f2937;">${greetingText}</div>`,
-    conversationId,
-    knowledgeContext: '',
-    logicContext: '',
-    sourcesUsed: 0,
-    sourceUrls: []
-  };
-}
+  // ── GREETING FAST PATH ────────────────────────────────────────────────────
+  if (intent === 'GREETING') {
+    // For greetings we still want the correct language, so run a tiny LLM call
+    // only if the language isn't English — otherwise use the static response.
+    let greetingText: string;
 
+    if (language === 'en') {
+      greetingText = `<p>Hi there 👋 How can I help you today?</p>`;
+    } else {
+      const tGreeting = timer('greeting fast-path LLM (non-English)');
+      try {
+        const { text } = await generateText({
+          model: googleAI('gemini-2.5-flash'),
+          prompt: `${langDirective}Reply to a friendly greeting in one short sentence wrapped in a <p> tag. Output only the HTML.`,
+          maxOutputTokens: 60,
+          temperature: 0.5,
+        });
+        tGreeting.end();
+        greetingText = text.trim() || `<p>👋</p>`;
+      } catch {
+        tGreeting.end();
+        greetingText = `<p>👋</p>`;
+      }
+    }
 
+    const htmlResponse = `<div style="line-height:1.6;color:#1f2937;">${greetingText}</div>`;
+    tTotal.end();
+    console.groupEnd();
+    return {
+      response: greetingText,
+      htmlResponse,
+      conversationId,
+      knowledgeContext: '',
+      logicContext: '',
+      sourcesUsed: 0,
+      sourceUrls: []
+    };
+  }
 
-  // STEP 2: Smart vector search — original query first, only expand if needed
+  // STEP 2: Vector search
   const tStep2 = timer(`Step 2: vector search (smart, ${chatbot.knowledgeBases?.length ?? 0} KBs)`);
-  
-  // Always search with original query only — 1 embedding per KB (3 total, not 6)
-  // Query rewriting still enriches the LLM prompt but we avoid duplicate embeddings
   const tPhase2a = timer('  Phase 2a: original query search');
-  const originalQuery = queries[0]; // always the original userMessage
+  const originalQuery = queries[0];
   const searchresults = (await Promise.all(
     chatbot.knowledgeBases.map((kb: any) =>
       searchSimilar({
@@ -687,11 +733,8 @@ if (intent === 'GREETING') {
   )).flat();
   tPhase2a.end();
 
-  // Confidence threshold — avoid forced robotic RAG
-const bestScore = searchresults.reduce((max, r) => Math.max(max, r.score ?? 0), 0);
-
+  const bestScore = searchresults.reduce((max, r) => Math.max(max, r.score ?? 0), 0);
   console.log(`   └─ ${searchresults.length} results, best score: ${bestScore.toFixed(3)}`);
-
   tStep2.end();
 
   const tProcess = timer('Step 2b: processSearchResults');
@@ -699,59 +742,45 @@ const bestScore = searchresults.reduce((max, r) => Math.max(max, r.score ?? 0), 
   tProcess.end();
 
   console.log(`   └─ knowledgeContext length: ${knowledgeContext.length} chars, sources: ${sources.length}`);
-    
+
   const strongContext = bestScore >= 0.45 && knowledgeContext.length > 0;
-     
-  // STEP 3: LLM generation
-  
-const prompt = strongContext
-  ? RAG_ANSWER_PROMPT
-      .replace('{intent}', intent)
-      .replace('{context}', knowledgeContext)
-      .replace('{history}', formattedHistory)
-      .replace('{question}', enrichedUserMessage)
-  : GENERAL_ANSWER_PROMPT
-      .replace('{intent}', intent)
-      .replace('{systemPrompt}', generateSystemPrompt(chatbot))
-      .replace('{history}', formattedHistory)
-      .replace('{logicContext}', logicContext)
-     .replace('{question}', enrichedUserMessage);
 
-  const tLLM = timer('Step 3: LLM generateText (gemini-2.5-flash-preview)');
- // First generation (creative)
-const { text } = await generateText({
-  model: googleAI('gemini-2.5-flash'),
-  prompt,
-  maxOutputTokens: chatbot.max_tokens || 400,
-  temperature: chatbot.temperature ?? 0.82,
-});
+  // STEP 3: LLM generation — language directive injected into both prompt branches
+  const prompt = strongContext
+    ? RAG_ANSWER_PROMPT
+        .replace('{languageDirective}', langDirective)
+        .replace('{context}', knowledgeContext)
+        .replace('{history}', formattedHistory)
+        .replace('{question}', enrichedUserMessage)
+    : GENERAL_ANSWER_PROMPT
+        .replace('{languageDirective}', langDirective)
+        .replace('{systemPrompt}', generateSystemPrompt(chatbot))
+        .replace('{history}', formattedHistory)
+        .replace('{logicContext}', logicContext)
+        .replace('{question}', enrichedUserMessage);
 
-
+  const tLLM = timer('Step 3: LLM generateText (gemini-2.5-flash)');
+  const { text } = await generateText({
+    model: googleAI('gemini-2.5-flash'),
+    prompt,
+    maxOutputTokens: chatbot.max_tokens || 400,
+    temperature: chatbot.temperature ?? 0.82,
+  });
   tLLM.end();
 
   console.log(`   └─ LLM output length: ${text.length} chars`);
 
   const tHtml = timer('Step 4: cleanHtml + appendReadMore');
-let cleaned = cleanHtmlResponse(ensureHtmlFormat(text));
+  let cleaned = cleanHtmlResponse(ensureHtmlFormat(text));
 
-const isFallback = false;
+  const isKnowledgeIntent = intent === 'FEATURE' || intent === 'GENERAL';
+  const shortMessage = userMessage.trim().length < 20;
+  const shouldShowSources = strongContext && isKnowledgeIntent && !shortMessage && cleaned.length > 120;
 
-const isKnowledgeIntent =
-  intent === 'FEATURE' ||
-  intent === 'GENERAL';
-
-const shortMessage = userMessage.trim().length < 20;
-
-const shouldShowSources =
-  strongContext &&
-  isKnowledgeIntent &&
-  !shortMessage &&
-  cleaned.length > 120;
-
-const htmlResponse = shouldShowSources
-  ? appendReadMoreSection(cleaned, sources)
-  : cleaned;
-    tHtml.end();
+  const htmlResponse = shouldShowSources
+    ? appendReadMoreSection(cleaned, sources)
+    : cleaned;
+  tHtml.end();
 
   tTotal.end();
   console.groupEnd();
@@ -769,27 +798,22 @@ const htmlResponse = shouldShowSources
 
 function extractSourceUrl(r: any): { url: string; title: string } | null {
   const m = r.metadata || {};
-  
-  // Try all known metadata fields where a URL might live
-  // Your Document model uses 'source' as the canonical URL field
   const url =
-    m.source ||   // Document.source — the primary URL field in your schema
-    m.url ||      // alternate key some scrapers use
+    m.source ||
+    m.url ||
     m.link ||
     m.pageUrl ||
-    r.source ||   // sometimes hoisted to top level by vector store
+    r.source ||
     null;
 
   if (!url || !(url.startsWith('http://') || url.startsWith('https://'))) return null;
 
-  // Derive a human-readable title
   const title =
     m.title ||
     m.name ||
     m.filename ||
     m.page_title ||
     (() => {
-      // Fall back to cleaned-up URL hostname + path
       try {
         const u = new URL(url);
         const path = u.pathname.replace(/\/$/, '').split('/').filter(Boolean).pop() || '';
@@ -816,14 +840,12 @@ function processSearchResults(allResults: any[], chatbot: any) {
     .sort((a, b) => b.score - a.score)
     .slice(0, 8);
 
-  // Build context — include source label so LLM knows what each chunk is about
   const context = uniqueResults.map((r, i) => {
     const src = extractSourceUrl(r);
     const label = src?.title || r.metadata?.title || `Source ${i + 1}`;
     return `[${label}]\n${r.content}`;
   }).join('\n\n');
 
-  // Collect unique source URLs using the robust extractor
   const sourceMap = new Map<string, { title: string; url: string }>();
   for (const r of uniqueResults) {
     const src = extractSourceUrl(r);
@@ -833,7 +855,6 @@ function processSearchResults(allResults: any[], chatbot: any) {
   }
   const sources = Array.from(sourceMap.values()).slice(0, 5);
 
-  // Debug log so you can see what metadata looks like
   if (uniqueResults.length > 0) {
     console.log('🔍 Sample result metadata:', JSON.stringify(uniqueResults[0]?.metadata, null, 2));
     console.log(`🔗 Sources found: ${sources.length}`, sources.map(s => s.url));
@@ -847,7 +868,13 @@ export async function executeSearchChain(config: SearchChainConfig): Promise<Sea
   console.group('⛓️ executeSearchChain');
   const tTotal = timer('executeSearchChain [total]');
 
-  const { chatbotId, conversationId, userMessage, chatbot: preloadedChatbot } = config;
+  const {
+    chatbotId,
+    conversationId,
+    userMessage,
+    chatbot: preloadedChatbot,
+    language = 'en',  // ← destructure with default
+  } = config;
 
   let chatbot = preloadedChatbot ?? null;
   if (!chatbot) {
@@ -855,21 +882,18 @@ export async function executeSearchChain(config: SearchChainConfig): Promise<Sea
     chatbot = await prisma.chatbot.findUnique({
       where: { id: chatbotId },
       include: {
-        knowledgeBases: {
-          select: { id: true, name: true }
-        },
+        knowledgeBases: { select: { id: true, name: true } },
         logic: true,
         form: true
       }
     });
     tChatbot.end();
   } else {
-    console.log('\u2705 [executeSearchChain] using pre-fetched chatbot — skipped DB call');
+    console.log('✅ [executeSearchChain] using pre-fetched chatbot — skipped DB call');
   }
 
   if (!chatbot) throw new Error('Chatbot not found');
 
-  // ── Get/create conversation first (needed for message storage) ──
   const tConv = timer('prisma: find or create conversation');
   let conversation;
   if (conversationId) {
@@ -886,7 +910,6 @@ export async function executeSearchChain(config: SearchChainConfig): Promise<Sea
   }
   tConv.end();
 
-  // ── Parallel: store user message + fetch chatbotLogic (shared by triggers & RAG) ──
   const tParallel = timer('prisma: store user message + fetch chatbotLogic (parallel)');
   const [, chatbotLogicRecord] = await Promise.all([
     prisma.message.create({
@@ -896,15 +919,19 @@ export async function executeSearchChain(config: SearchChainConfig): Promise<Sea
   ]);
   tParallel.end();
 
-  // checkLogicTriggers reuses the already-fetched logic record — zero extra DB calls
   const tLogic = timer('checkLogicTriggers (reusing prefetched logic)');
   const triggeredLogics = await checkLogicTriggers(chatbot, userMessage, chatbotLogicRecord);
   tLogic.end();
 
   const { response, htmlResponse, knowledgeContext, logicContext, sourcesUsed, sourceUrls } =
-    await generateRAGResponse(chatbot, userMessage, conversation.id, chatbotLogicRecord);
+    await generateRAGResponse(
+      chatbot,
+      userMessage,
+      conversation.id,
+      chatbotLogicRecord,
+      language  // ← forwarded
+    );
 
-  // Fire-and-forget: don't block the API response on a DB write (saves 5-13s)
   prisma.message.create({
     data: { content: htmlResponse, senderType: 'BOT', conversationId: conversation.id }
   }).then(() => {
@@ -984,10 +1011,13 @@ export async function streamRAGResponse(
   chatbot: any,
   userMessage: string,
   conversationId: string,
-  onChunk?: (chunk: string) => void
+  onChunk?: (chunk: string) => void,
+  language = 'en'   // ← new param, safe default
 ): Promise<ReadableStream<string>> {
   console.group('🌊 streamRAGResponse');
   const tTotal = timer('streamRAGResponse setup [total before stream starts]');
+
+  const langDirective = languageDirective(language);
 
   const tHistory = timer('prisma: fetch recent history');
   const history = await prisma.message.findMany({
@@ -1002,15 +1032,36 @@ export async function streamRAGResponse(
 
   const formattedHistory = formatHistory(history);
   const intent = detectIntent(userMessage);
+
+  // ── GREETING FAST PATH ────────────────────────────────────────────────────
   if (intent === 'GREETING') {
-  const greeting = `<p>Hi there 👋 How can I help you today?</p>`;
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(greeting);
-      controller.close();
+    let greetingText: string;
+
+    if (language === 'en') {
+      greetingText = `<p>Hi there 👋 How can I help you today?</p>`;
+    } else {
+      try {
+        const { text } = await generateText({
+          model: googleAI('gemini-2.5-flash'),
+          prompt: `${langDirective}Reply to a friendly greeting in one short sentence wrapped in a <p> tag. Output only the HTML.`,
+          maxOutputTokens: 60,
+          temperature: 0.5,
+        });
+        greetingText = text.trim() || `<p>👋</p>`;
+      } catch {
+        greetingText = `<p>👋</p>`;
+      }
     }
-  });
-}
+
+    tTotal.end();
+    console.groupEnd();
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(greetingText);
+        controller.close();
+      }
+    });
+  }
 
   const tRewrite = timer('rewriteQuery');
   const queries = await rewriteQuery(userMessage);
@@ -1024,22 +1075,23 @@ export async function streamRAGResponse(
   const logicContext = await getLogicContext(chatbot, userMessage);
   tLogic.end();
 
+  // Language directive injected into both prompt branches
   const prompt = knowledgeContext
-  ? RAG_ANSWER_PROMPT
-      .replace('{intent}', intent)
-      .replace('{context}', knowledgeContext)
-      .replace('{history}', formattedHistory)
-      .replace('{question}', userMessage)
-  : GENERAL_ANSWER_PROMPT
-      .replace('{intent}', intent)
-      .replace('{systemPrompt}', generateSystemPrompt(chatbot))
-      .replace('{history}', formattedHistory)
-      .replace('{logicContext}', logicContext)
-      .replace('{question}', userMessage);
+    ? RAG_ANSWER_PROMPT
+        .replace('{languageDirective}', langDirective)
+        .replace('{context}', knowledgeContext)
+        .replace('{history}', formattedHistory)
+        .replace('{question}', userMessage)
+    : GENERAL_ANSWER_PROMPT
+        .replace('{languageDirective}', langDirective)
+        .replace('{systemPrompt}', generateSystemPrompt(chatbot))
+        .replace('{history}', formattedHistory)
+        .replace('{logicContext}', logicContext)
+        .replace('{question}', userMessage);
 
   const tStreamInit = timer('streamText init (LLM call start)');
   const result = await streamText({
-    model: googleAI('gemini-2.5-flash'),  // fast, stable, low-latency
+    model: googleAI('gemini-2.5-flash'),
     prompt,
     maxOutputTokens: chatbot.max_tokens || 400,
     temperature: chatbot.temperature ?? 0.82,

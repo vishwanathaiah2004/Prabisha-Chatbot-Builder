@@ -24,6 +24,8 @@ export async function POST(request: NextRequest) {
     const message = body.message || body.input;
     const chatbotId = body.chatbotId;
     let conversationId = body.conversationId;
+    // BCP-47 language code from the frontend language selector (e.g. 'en', 'ja', 'ar')
+    const language: string = body.language || 'en';
 
     if (!message?.trim()) {
       return NextResponse.json({ error: 'Message required' }, { status: 400 });
@@ -37,7 +39,7 @@ export async function POST(request: NextRequest) {
       where: { id: chatbotId },
       include: {
         knowledgeBases: {
-          select: { id: true, name: true } // avoid loading all KB content/documents
+          select: { id: true, name: true }
         },
         logic: true,
         form: true
@@ -71,7 +73,8 @@ export async function POST(request: NextRequest) {
       chatbotId,
       conversationId,
       userMessage: message,
-      chatbot, // ← pass pre-fetched chatbot — avoids a second 6s DB call
+      chatbot,
+      language, // ← forwarded to the LLM prompts
     });
     tChain.end();
 

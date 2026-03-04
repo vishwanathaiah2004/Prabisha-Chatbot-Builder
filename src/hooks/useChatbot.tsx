@@ -26,6 +26,12 @@ interface UseChatbotProps {
   conversationalLeadConfig?: ConversationalLeadConfig | null;
   /** Called when lead is fully collected */
   onLeadCollected?: (data: Record<string, string>) => void;
+  /**
+   * BCP-47 language code selected by the user (e.g. 'en', 'ja', 'ar').
+   * Sent to the backend so the AI responds in the correct language.
+   * Defaults to 'en' when omitted.
+   */
+  language?: string;
 }
 
 interface UseChatbotReturn {
@@ -71,7 +77,13 @@ function timer(label: string) {
   };
 }
 
-export function useChatbot({ chatbotId, initialChatbotData, conversationalLeadConfig, onLeadCollected }: UseChatbotProps): UseChatbotReturn {
+export function useChatbot({
+  chatbotId,
+  initialChatbotData,
+  conversationalLeadConfig,
+  onLeadCollected,
+  language = 'en',
+}: UseChatbotProps): UseChatbotReturn {
   const [chatbot, setChatbot] = useState<ChatbotData | null>(initialChatbotData || null);
   const [isLoadingChatbot, setIsLoadingChatbot] = useState(!initialChatbotData);
   const [chatbotError, setChatbotError] = useState<string | null>(null);
@@ -86,6 +98,11 @@ export function useChatbot({ chatbotId, initialChatbotData, conversationalLeadCo
   const [quickQuestions, setQuickQuestions] = useState<string[]>([]);
   const [mode, setMode] = useState<'streaming' | 'standard'>('standard');
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+
+  // Keep a ref so streaming/standard handlers always read the latest value
+  // without needing to be re-created when language changes.
+  const languageRef = useRef(language);
+  useEffect(() => { languageRef.current = language; }, [language]);
 
   // ── Conversational lead: inject a BOT message directly into chat ──────────
   const onBotMessage = useCallback((content: string) => {
@@ -220,36 +237,9 @@ export function useChatbot({ chatbotId, initialChatbotData, conversationalLeadCo
     }
   }, [hasLoadedInitialMessages]);
 
-  const sendMessage = useCallback(async (searchQuery: string) => {
-    console.group(`🚀 sendMessage [mode=${mode}] — "${searchQuery.substring(0, 40)}..."`);
-    const tSubmit = timer('sendMessage [total including UI updates]');
-
-    setMessages(prev => [...prev, { senderType: 'USER', content: searchQuery, createdAt: new Date() }]);
-    setLoading(true);
-    setStatus('submitted');
-    setError('');
-    setText('');
-    setTimeout(() => inputRef.current?.focus(), 50);
-
-    if (mode === 'streaming') {
-      await handleStreamingSubmit(searchQuery);
-    } else {
-      await handleStandardSubmit(searchQuery);
-    }
-
-    tSubmit.end();
-    console.groupEnd();
-  }, [mode]);
-
-  useEffect(() => {
-    if (conversationalLead.status === 'done' && pendingMessage) {
-      const timer = setTimeout(() => {
-        sendMessage(pendingMessage);
-        setPendingMessage(null);
-      }, 800);
-      return () => clearTimeout(timer);
-    }
-  }, [conversationalLead.status, pendingMessage, sendMessage]);
+  // ─────────────────────────────────────────────────────────────────────────
+  // Streaming submit
+  // ─────────────────────────────────────────────────────────────────────────
 
   const handleStreamingSubmit = async (searchQuery: string) => {
     const tTotal = timer('handleStreamingSubmit [total]');
@@ -265,7 +255,13 @@ export function useChatbot({ chatbotId, initialChatbotData, conversationalLeadCo
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: searchQuery, conversationId, chatbotId }),
+        body: JSON.stringify({
+          message: searchQuery,
+          conversationId,
+          chatbotId,
+          // Tell the AI which language to reply in
+          language: languageRef.current,
+        }),
       });
       tFetch.end();
 
@@ -334,6 +330,10 @@ export function useChatbot({ chatbotId, initialChatbotData, conversationalLeadCo
     }
   };
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Standard submit
+  // ─────────────────────────────────────────────────────────────────────────
+
   const handleStandardSubmit = async (searchQuery: string) => {
     const tTotal = timer('handleStandardSubmit [total]');
 
@@ -342,7 +342,13 @@ export function useChatbot({ chatbotId, initialChatbotData, conversationalLeadCo
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: searchQuery, conversationId, chatbotId }),
+        body: JSON.stringify({
+          message: searchQuery,
+          conversationId,
+          chatbotId,
+          // Tell the AI which language to reply in
+          language: languageRef.current,
+        }),
       });
       tFetch.end();
 
@@ -390,28 +396,60 @@ export function useChatbot({ chatbotId, initialChatbotData, conversationalLeadCo
     }
   };
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // sendMessage
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const sendMessage = useCallback(async (searchQuery: string) => {
+    console.group(`🚀 sendMessage [mode=${mode}] — "${searchQuery.substring(0, 40)}..."`);
+    const tSubmit = timer('sendMessage [total including UI updates]');
+
+    setMessages(prev => [...prev, { senderType: 'USER', content: searchQuery, createdAt: new Date() }]);
+    setLoading(true);
+    setStatus('submitted');
+    setError('');
+    setText('');
+    setTimeout(() => inputRef.current?.focus(), 50);
+
+    if (mode === 'streaming') {
+      await handleStreamingSubmit(searchQuery);
+    } else {
+      await handleStandardSubmit(searchQuery);
+    }
+
+    tSubmit.end();
+    console.groupEnd();
+  }, [mode]);
+
+  useEffect(() => {
+    if (conversationalLead.status === 'done' && pendingMessage) {
+      const t = setTimeout(() => {
+        sendMessage(pendingMessage);
+        setPendingMessage(null);
+      }, 800);
+      return () => clearTimeout(t);
+    }
+  }, [conversationalLead.status, pendingMessage, sendMessage]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // handleSubmit (public API)
+  // ─────────────────────────────────────────────────────────────────────────
+
   const handleSubmit = async (e?: React.FormEvent, overrideText?: string) => {
     if (e) e.preventDefault();
     const searchQuery = (overrideText || text).trim();
     if (!searchQuery) { setError('Please enter a message'); return; }
 
     // ── Conversational lead intercept ────────────────────────────────────────
-    // If we're mid-lead-collection, let the lead hook consume this message.
-    // We still show the user's message in chat, but skip the AI call.
     if (conversationalLead.isAwaitingLeadAnswer) {
-      // Show user message in chat
       setMessages(prev => [...prev, { senderType: 'USER', content: searchQuery, createdAt: new Date() }]);
       setText('');
       setTimeout(() => inputRef.current?.focus(), 50);
-      // Let lead hook handle the reply (it will call onBotMessage for the next question)
       await conversationalLead.handleUserMessage(searchQuery);
       return;
     }
-    // ────────────────────────────────────────────────────────────────────────
 
-    // ── Auto-start lead collection if needed ────────────────────────────────
-    // If conversational lead config exists and hasn't started collecting yet,
-    // intercept the message to ask lead questions first
+    // ── Auto-start lead collection if needed ─────────────────────────────────
     if (conversationalLeadConfig && conversationalLead.status === 'idle') {
       setPendingMessage(searchQuery);
       setText('');
@@ -419,7 +457,6 @@ export function useChatbot({ chatbotId, initialChatbotData, conversationalLeadCo
       conversationalLead.startLeadCollection();
       return;
     }
-    // ────────────────────────────────────────────────────────────────────────
 
     await sendMessage(searchQuery);
   };
