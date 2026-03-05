@@ -158,8 +158,9 @@ export default function Footer() {
         <div className="border-t border-border pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <p className="text-muted-foreground text-center md:text-left">
-              © 2026 Prabisha Consulting. All rights reserved.
+              © {new Date().getFullYear()} Prabisha Consulting. All rights reserved.
             </p>
+
             <div className="flex items-center space-x-6 text-muted-foreground">
               <span className="flex items-center space-x-2">
                 <span>Built with</span>
