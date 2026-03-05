@@ -135,15 +135,7 @@ export default function Header() {
         { title: "EcoKartUK", href: "https://www.ecokartuk.com/" },
       ]
     },
-    {
-      title: "Legal",
-      items: [
-        { title: "Privacy Policy", href: "/privacy-policy" },
-        { title: "Terms of Service", href: "/terms-of-service" },
-        { title: "Cookie Policy", href: "/cookie-policy" },
-        { title: "Help Center", href: "/help-center" },
-      ],
-    },
+   
     {
       title: "Company",
       items: [
