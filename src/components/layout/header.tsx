@@ -144,12 +144,7 @@ export default function Header() {
         { title: "Contact", href: "https://prabisha.com/contact/" },
       ],
     },
-    {
-      title: "Resources",
-      items: [
-        { title: "Blogs", href: "/blogs" },
-      ]
-    }
+  
   ];
 
   return (

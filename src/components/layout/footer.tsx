@@ -77,15 +77,15 @@ export default function Footer() {
                 { name: "Contact", href: "https://prabisha.com/contact/" },
               ],
             },
-            {
-              title: "Resources",
-              links: [
-                { name: "Privacy Policy", href: "https://www.prishatheexplorer.com/privacy-policy/" },
-                { name: "Terms of Service", href: "https://prishatheexplorer.com/terms-of-service/" },
-                { name: "Cookie Policy", href: "/cookie-policy" },
-                { name: "Help Center", href: "/help-center" },
-              ],
-            },
+            // {
+            //   title: "Resources",
+            //   links: [
+            //     { name: "Privacy Policy", href: "https://www.prishatheexplorer.com/privacy-policy/" },
+            //     { name: "Terms of Service", href: "https://prishatheexplorer.com/terms-of-service/" },
+            //     { name: "Cookie Policy", href: "/cookie-policy" },
+            //     { name: "Help Center", href: "/help-center" },
+            //   ],
+            // },
           ].map((section, index) => (
             <div key={index} className="space-y-6">
               <h3 className="font-bold text-xl text-foreground relative">
@@ -158,8 +158,9 @@ export default function Footer() {
         <div className="border-t border-border pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <p className="text-muted-foreground text-center md:text-left">
-              © 2026 Prabisha Consulting. All rights reserved.
+              © {new Date().getFullYear()} Prabisha Consulting. All rights reserved.
             </p>
+
             <div className="flex items-center space-x-6 text-muted-foreground">
               <span className="flex items-center space-x-2">
                 <span>Built with</span>
