@@ -63,32 +63,31 @@ export default function SourceBytesOfficialUI() {
   return (
     <>
       <Header />
-      <div 
+      <div
         style={{ fontFamily: '"GeistSans", "GeistSans Fallback", sans-serif' }}
         className="mt-20 w-full min-h-screen responsive-headers font-sans selection:bg-[#EF6A37]/30"
       >
-        
+
         {/* SECTION 1: HERO */}
-        <section className="lg:min-h-[calc(100vh-100px)] mx-auto my-8 flex items-center justify-center relative -z-[1]">
+        <section className="lg:min-h-[calc(100vh-100px)] mx-auto my-6 sm:my-8 flex items-center justify-center relative">
           <div className="xl:container mx-auto w-full pl-4 sm:pl-8 lg:pl-14 flex flex-col lg:flex-row justify-center items-center my-auto lg:gap-24 gap-6">
             <div className="w-full mx-auto lg:flex-1">
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tighter text-[#111827]">
+              <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold tracking-tighter text-gray-900 dark:text-white">
                 Unlock the future of business
               </h1>
-              <span className="text-5xl md:text-6xl lg:text-7xl font-bold max-w-3xl text-[#EF6A37] tracking-tighter">
+              <span className="block text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold max-w-3xl text-[#EF6A37] tracking-tighter">
                 automation
               </span>
-              <p className="w-full text-lg md:text-xl lg:text-2xl lg:max-w-[700px] my-4 pt-4 pr-4 text-gray-600">
+              <p className="w-full text-base sm:text-lg md:text-xl lg:text-2xl lg:max-w-[700px] my-4 pt-4 pr-4 text-gray-600 dark:text-gray-300">
                 Our platform centralizes your data and empowers organizations to leverage state-of-the-art AI for smarter conversations, automated tasks, and instant insights.
               </p>
             </div>
             <div className="relative lg:flex-1 gap-6 w-full">
               {/* Note: The 'font-cavet' class requires the Caveat font to be loaded in your layout */}
-              <span className="w-fit block mb-4 lg:mb-0 absolute lg:top-1/2 lg:-left-20 font-bold bg-[#F5F5FD] text-black p-2 px-8 rounded-xl text-2xl md:text-3xl shadow-sm z-10">
+              <span className="w-fit block mb-4 lg:mb-0 lg:absolute lg:top-1/2 lg:-left-20 font-bold bg-[#F5F5FD] dark:bg-[#2A2A3B] text-black dark:text-white p-2 px-6 rounded-xl text-lg md:text-2xl shadow-sm z-10">
                 AI Powered
               </span>
-              <div className="bg-gray-100 rounded-[40px] aspect-[740/500] w-full flex items-center justify-center border-2 border-dashed border-gray-200">
-                <Image src="/home/main.jpg" alt="Hero Image" width={740} height={500} className="object-cover rounded-[40px]" />
+              <div className="bg-gray-100 dark:bg-[#1C1C28] rounded-[24px] sm:rounded-[40px] aspect-[740/500] w-full flex items-center justify-center border border-gray-200 dark:border-gray-700">                <Image src="/home/main.jpg" alt="Hero Image" width={740} height={500} className="object-cover rounded-[40px]" />
               </div>
             </div>
           </div>
@@ -97,10 +96,10 @@ export default function SourceBytesOfficialUI() {
         {/* SECTION 2: CHAT & VOICE CARDS */}
         <section className="container mx-auto w-full my-16 gap-6 px-4">
           <div className="text-center mb-6 lg:mb-12">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
+           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 dark:text-white">
               AI at the Heart of User Experience
             </h1>
-            <p className="mx-auto mb-4 mt-4 max-w-4xl text-xl md:text-2xl text-gray-500">
+           <p className="mx-auto mb-4 mt-4 max-w-4xl text-base sm:text-lg md:text-xl text-gray-500 dark:text-gray-300">
               Empower your business with SourceBytes.AI’s tools and experience a transformation in how you work.
             </p>
           </div>
@@ -114,11 +113,11 @@ export default function SourceBytesOfficialUI() {
                   <span className="text-white">↗</span>
                 </div>
               </div>
-              <p className="text-white/90 text-2xl text-center max-w-md">
+              <p className="text-white/90 text-base sm:text-lg md:text-xl text-center max-w-md">
                 Allows you to create powerful, conversational chatbots tailored for your business. No technical skills required, no extra fees, no coding required.
               </p>
             </button>
-            <button  onClick={() => handleLogin()} className="cursor-pointer flex flex-col flex-1 min-h-[352px] bg-[#0C1C2E] lg:p-12 md:p-8 px-6 py-8 items-center justify-center gap-4 rounded-xl md:rounded-[80px] group transition-all">
+            <button onClick={() => handleLogin()} className="cursor-pointer flex flex-col flex-1 min-h-[352px] bg-[#0C1C2E] lg:p-12 md:p-8 px-6 py-8 items-center justify-center gap-4 rounded-xl md:rounded-[80px] group transition-all">
               <div className="flex items-center justify-center gap-2">
                 <h1 className="text-white font-bold tracking-tight group-hover:text-[#378DEF] transition-all duration-300 text-4xl md:text-5xl lg:text-6xl text-center">
                   AI Voice Agents
@@ -127,7 +126,7 @@ export default function SourceBytesOfficialUI() {
                   <span className="text-white">↗</span>
                 </div>
               </div>
-              <p className="text-white/90 text-2xl text-center max-w-md">
+             <p className="text-white/90 text-base sm:text-lg md:text-xl text-center max-w-md">
                 Handles inbound and outbound calls, offers natural interactions, enhances troubleshooting, and supports process scaling.
               </p>
             </button>
@@ -138,7 +137,7 @@ export default function SourceBytesOfficialUI() {
         <section className="container mx-auto lg:pt-12 pt-6">
           <div className="flex flex-col items-center justify-center mb-12">
             <div className="w-full">
-              
+
               {/* DESKTOP BENTO GRID (Expandable) */}
               <div className="hidden lg:flex gap-4 w-full h-[314px]">
                 {features.map((feature, index) => (
@@ -154,8 +153,8 @@ export default function SourceBytesOfficialUI() {
                       </div>
 
                       {/* Icon that rotates/flips based on state */}
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" 
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                         className={`lucide absolute top-6 right-4 transform transition-transform duration-300 ${activeIndex === index ? 'rotate-180' : 'rotate-0'}`}
                       >
                         <path d="M5 12h14"></path>
@@ -163,7 +162,7 @@ export default function SourceBytesOfficialUI() {
                       </svg>
 
                       <h1 className="text-[22px] font-bold text-[#000000]">{feature.title}</h1>
-                      
+
                       {/* Only show description if active */}
                       <div className={`transition-opacity duration-500 ${activeIndex === index ? 'opacity-100 block' : 'opacity-0 hidden'}`}>
                         <p className="text-[#000000] mt-2 text-lg/tight">
