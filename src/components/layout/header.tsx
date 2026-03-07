@@ -135,7 +135,7 @@ export default function Header() {
         { title: "EcoKartUK", href: "https://www.ecokartuk.com/" },
       ]
     },
-   
+
     {
       title: "Company",
       items: [
@@ -144,24 +144,24 @@ export default function Header() {
         { title: "Contact", href: "https://prabisha.com/contact/" },
       ],
     },
-  
+
   ];
 
   return (
-    <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-gray-100">
-      <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-        
+    <nav className="fixed top-0 w-full bg-white/70 dark:bg-[#0B0F1A]/70 backdrop-blur-xl z-50 border-b border-gray-200/60 dark:border-gray-800/60 transition-all duration-300">
+    <div className="max-w-7xl mx-auto px-6 lg:px-8 h-20 flex items-center justify-between">
+
         {/* LOGO SECTION - Restored your original logo */}
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center gap-3">
-            <Image 
-              src="/icons/logo1.png" 
-              alt="logo" 
-              width={40} 
-              height={40} 
+            <Image
+              src="/icons/logo1.png"
+              alt="logo"
+              width={40}
+              height={40}
               className="object-contain"
             />
-            <span className="text-xl font-bold tracking-tight text-[#111827] hidden sm:block">
+            <span className="text-xl font-bold tracking-tight text-gray-900 dark:text-white hidden sm:block">
               Chatbot Builder
             </span>
           </Link>
@@ -173,7 +173,7 @@ export default function Header() {
             <NavigationMenuList className="gap-2">
               {menuItems.map((item) => (
                 <NavigationMenuItem key={item.title}>
-                  <NavigationMenuTrigger className="bg-transparent text-gray-500 hover:text-black font-medium text-[14px] transition-colors data-[state=open]:bg-transparent">
+                  <NavigationMenuTrigger className="bg-transparent text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white font-medium text-[14px] transition-all duration-300 data-[state=open]:bg-transparent">
                     {item.title}
                   </NavigationMenuTrigger>
                   <NavigationMenuContent>
@@ -192,18 +192,17 @@ export default function Header() {
         {/* ACTIONS */}
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          
-          <button 
+
+          <button
             onClick={() => handleLogin()}
             className="hidden md:block text-sm font-semibold px-4 text-gray-600 hover:text-black transition-colors"
           >
             Sign In
           </button>
-          
-          <button 
+
+          <button
             onClick={() => handleLogin()}
-            className="bg-[#111827] text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-black/10 hover:bg-black transition-all active:scale-95"
-          >
+           className="relative overflow-hidden bg-gradient-to-r from-[#111827] to-[#1F2937] text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-black/20 hover:scale-105 transition-all duration-300 active:scale-95">
             Get Started
           </button>
 
@@ -237,12 +236,12 @@ export default function Header() {
                 />
               ))}
               <div className="p-4 pt-2">
-                 <Button 
-                   className="w-full rounded-full bg-[#111827]" 
-                   onClick={() => handleLogin()}
-                 >
-                    Get Started
-                 </Button>
+                <Button
+                  className="w-full rounded-full bg-[#111827]"
+                  onClick={() => handleLogin()}
+                >
+                  Get Started
+                </Button>
               </div>
             </div>
           </motion.div>
