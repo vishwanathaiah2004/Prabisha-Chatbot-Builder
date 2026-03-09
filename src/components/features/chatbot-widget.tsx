@@ -352,7 +352,7 @@ function LanguageSelector({
             type="button"
             onClick={() => { onChange(lang.code as LanguageCode); setOpen(false); }}
             className={[
-              'w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors text-left',
+              'w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors text-left cursor-pointer',
               lang.code === currentLang
                 ? 'bg-primary/10 text-primary font-medium'
                 : 'hover:bg-muted text-foreground',
@@ -375,7 +375,7 @@ function LanguageSelector({
         ref={triggerRef}
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="h-4 w-4 flex items-center justify-center aspect-square rounded-full text-xs font-medium text-muted-foreground hover:text-foreground"
+        className="h-4 w-4 flex items-center justify-center aspect-square rounded-full text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer"
         aria-label="Select language"
       >
         <Image
@@ -1035,7 +1035,7 @@ function ChatMessages({
                 <button
                   onClick={() => handleSpeak(id, message.content)}
                   className={[
-                    'p-1.5 rounded-full transition-all duration-200',
+                    'p-1.5 rounded-full transition-all duration-200 cursor-pointer',
                     isSpeaking
                       ? 'bg-primary/20 text-primary scale-110'
                       : 'hover:bg-primary/10 text-muted-foreground opacity-0 group-hover:opacity-100',
@@ -1233,7 +1233,7 @@ function ChatInput({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 rounded-full"
+                className="h-8 w-8 p-0 rounded-full cursor-pointer"
                 onClick={() => setShowPicker(false)}
               >
                 <XIcon className="h-4 w-4" />
@@ -1282,7 +1282,7 @@ function ChatInput({
                     e.preventDefault();
                     setShowPicker(!showPicker);
                   }}
-                  className={showPicker ? 'bg-muted' : ''}
+                 className={`${showPicker ? 'bg-muted' : ''} cursor-pointer`}
                 >
                   <SmilePlus className="h-4 w-4" />
                 </PromptInputButton>
@@ -1294,7 +1294,7 @@ function ChatInput({
                     size="sm"
                     variant="ghost"
                     onClick={onToggleMicrophone}
-                    className={isMicrophoneOn ? 'bg-destructive/10 text-destructive' : ''}
+                  className={`cursor-pointer ${isMicrophoneOn ? 'bg-destructive/10 text-destructive' : ''}`}
                   >
                     {isMicrophoneOn ? <MicOffIcon className="h-4 w-4" /> : <MicIcon className="h-4 w-4" />}
                   </PromptInputButton>
@@ -1305,7 +1305,7 @@ function ChatInput({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className={`rounded-full ${isMicrophoneOn ? 'bg-red-100 text-red-600' : 'hover:bg-gray-100'}`}
+                 className={`rounded-full cursor-pointer ${isMicrophoneOn ? 'bg-red-100 text-red-600' : 'hover:bg-gray-100'}`}
                   onClick={onNewChat}
                 >
                   <RefreshCw className="h-4 w-4" />

@@ -74,6 +74,7 @@ enum BorderType {
 
 model Chatbot {
   id          String  @id @default(cuid())
+  serialNo     Int?                            
   name        String
   description String?
   suggestions String[]

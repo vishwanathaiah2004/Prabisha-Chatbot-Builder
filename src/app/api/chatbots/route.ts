@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     // Get user session
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.email) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
       },
       select: {
         id: true,
+        serialNo: true,
         name: true,
         model: true,
         max_tokens: true,
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
   try {
     // Get user session
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user?.email) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -184,9 +185,18 @@ export async function POST(request: NextRequest) {
 
     // Use transaction to ensure all operations succeed or fail together
     const result = await prisma.$transaction(async (tx) => {
+
+      const lastChatbot = await tx.chatbot.findFirst({
+        where: { workspaceId },
+        orderBy: { serialNo: "desc" },
+        select: { serialNo: true }
+      });
+
+      const nextSerialNo = lastChatbot?.serialNo ? lastChatbot.serialNo + 1 : 1;
       // 1. Create the chatbot
       const chatbot = await tx.chatbot.create({
         data: {
+          serialNo: nextSerialNo,
           name: name.trim(),
           directive: `
             # Objective: You are an exceptional customer support representative. Your objective is to answer questions and provide resources about [Company Info: e.g., name and brief description of business or project]. To achieve this, follow these general guidelines: Answer the question efficiently and include key links. If a question is not clear, ask follow-up questions.
@@ -257,7 +267,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { 
+      {
         message: 'Chatbot created successfully with default form and logic',
         chatbot: result.chatbot,
         form: result.form,
@@ -267,7 +277,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error('Error creating chatbot:', error);
-    
+
     // Handle specific Prisma errors
     if (error instanceof Error) {
       // Check for unique constraint violation
@@ -277,7 +287,7 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
-      
+
       // Check for foreign key constraint (workspace not found)
       if (error.message.includes('Foreign key constraint')) {
         return NextResponse.json(

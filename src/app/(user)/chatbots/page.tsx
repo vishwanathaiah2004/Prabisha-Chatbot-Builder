@@ -43,6 +43,7 @@ type FormValues = z.infer<typeof formSchema>
 
 interface Chatbot {
   id: string
+  serialNo: number
   name: string
   icon: string
   greeting: string
@@ -98,22 +99,22 @@ export default function ChatbotsPage() {
 
   const fetchChatbots = async () => {
     if (!activeWorkspace?.id) return;
-    
+
     try {
       setIsLoading(true)
       setError(null)
       const response = await fetch(`/api/chatbots?workspaceId=${activeWorkspace?.id}`)
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch chatbots')
       }
-      
+
       const data = await response.json()
       setChatbots(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
       console.error('Error fetching chatbots:', err)
-      
+
       toast.error("Failed to load chatbots")
     } finally {
       setIsLoading(false)
@@ -138,7 +139,7 @@ export default function ChatbotsPage() {
       }
 
       setChatbots(chatbots.filter(chatbot => chatbot.id !== chatbotToDelete.id))
-      
+
       toast.success(`${chatbotToDelete.name} has been deleted successfully.`);
     } catch (err) {
       toast.error("Failed to delete chatbot");
@@ -175,9 +176,9 @@ export default function ChatbotsPage() {
 
       const data = await response.json()
       fetchChatbots()
-      
+
       toast.success("Chatbot duplicated")
-      
+
       return data
     } catch (err) {
       toast.error("Failed to duplicate chatbot")
@@ -246,7 +247,7 @@ export default function ChatbotsPage() {
       'gemini-pro': 'Gemini Pro',
       'llama-2': 'Llama 2',
     }
-    
+
     return modelMap[model] || model
   }
 
@@ -257,14 +258,14 @@ export default function ChatbotsPage() {
           <Skeleton className="h-10 w-48" />
           <Skeleton className="h-10 w-32" />
         </div>
-        
+
         <div className="flex gap-3">
           <Skeleton className="h-10 flex-1" />
           <Skeleton className="h-10 w-40" />
           <Skeleton className="h-10 w-10" />
           <Skeleton className="h-10 w-10" />
         </div>
-        
+
         <div className="rounded-lg border">
           <Table>
             <TableHeader>
@@ -344,7 +345,7 @@ export default function ChatbotsPage() {
             <AlertDialogTitle>Duplicate Chatbot</AlertDialogTitle>
             <AlertDialogDescription>
               This will create a copy of{" "}
-              <span className="font-semibold">{chatbotToDuplicate?.name}</span>. 
+              <span className="font-semibold">{chatbotToDuplicate?.name}</span>.
               The duplicate will have "(Copy)" appended to its name.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -393,9 +394,8 @@ export default function ChatbotsPage() {
                       </FormControl>
                       <div className="flex justify-between items-center">
                         <FormMessage />
-                        <span className={`text-xs ${
-                          field.value.length > 50 ? 'text-destructive' : 'text-muted-foreground'
-                        }`}>
+                        <span className={`text-xs ${field.value.length > 50 ? 'text-destructive' : 'text-muted-foreground'
+                          }`}>
                           {field.value.length}/50
                         </span>
                       </div>
@@ -449,9 +449,9 @@ export default function ChatbotsPage() {
         <Button variant="ghost" size="icon" title="Bookmark view">
           <Bookmark className="h-4 w-4" />
         </Button>
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           title="Refresh"
           onClick={fetchChatbots}
         >
@@ -464,12 +464,13 @@ export default function ChatbotsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[60px]">S.NO.</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Conversations</TableHead>
               <TableHead>Model</TableHead>
               <TableHead>Knowledge Bases</TableHead>
               <TableHead>Last modified</TableHead>
-              <TableHead> Actions</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -490,8 +491,11 @@ export default function ChatbotsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredChatbots.slice(0, Number.parseInt(itemsPerPage)).map((chatbot) => (
+              filteredChatbots.slice(0, Number.parseInt(itemsPerPage)).map((chatbot, index) => (
                 <TableRow key={chatbot.id}>
+                  <TableCell className="text-center font-medium">
+                    {index + 1}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Image className="h-6 w-6 rounded-full" height={16} width={16} src={chatbot.icon || '/icons/logo1.png'} alt="" />
