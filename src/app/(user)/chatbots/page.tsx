@@ -365,7 +365,7 @@ export default function ChatbotsPage() {
         <h1 className="text-3xl font-bold tracking-tight">Chatbots</h1>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2 cursor-pointer">
               <Plus className="h-4 w-4" />
               Create
             </Button>
